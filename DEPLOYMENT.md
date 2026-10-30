@@ -236,3 +236,15 @@ reviewed migration; never invent an identity mapping. The verifier freezes a
 detached admission snapshot; changing a caller's dictionary cannot mutate active
 authority. Only the `azp` profile is supported; alternative claim selectors fail.
 This 0.3 source revision is **local and not deployed** by this task.
+
+## Local protocol compatibility increment (activation pending)
+
+The adapter now uses the official SDK's stateless legacy serving, in addition to
+modern2026-07-28. Exact supported versions are2026-07-28,2025-11-25,2025-06-18,
+2025-03-26. It issues no transport session IDs, preserves per-request auth and
+runs the same nine scoped tools. Unsupported operation versions still reject;
+legacy initialize uses the standard supported-version counter-offer rule.
+Five new local tests cover all three reported Muse versions plus raw HTTP and
+mixed modern/legacy state sharing; see `mcp_adapter/README.md` for the matrix.
+These are synthetic tests, not live Muse/Pip or OAuth evidence. No provider,
+grant, hosted source update or public deployment was performed in this increment.

@@ -1,39 +1,49 @@
 npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
 
 > test
-> node --test test.mjs test_faults.mjs
+> node --test test.mjs test_faults.mjs test_protocols.mjs
 
 responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
-✔ modern official SDK discovery, nine schema-validated tools, real JWT + durable kernel (941.75827ms)
+✔ modern official SDK discovery, nine schema-validated tools, real JWT + durable kernel (1159.922055ms)
 responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
-✔ production worker fails closed without credentials (167.861114ms)
-✔ production hostname gate, Railway health probe, and unconfigured public staging (185.659099ms)
-✔ worker exit: all pending calls fail closed and timers clear (203.915828ms)
-✔ worker stall: all pending calls fail closed and timers clear (1509.539856ms)
-✔ worker malformed: all pending calls fail closed and timers clear (111.375913ms)
-✔ worker wrong-id: all pending calls fail closed and timers clear (89.170904ms)
-✔ worker partial: all pending calls fail closed and timers clear (105.583836ms)
-✔ worker oversize: all pending calls fail closed and timers clear (230.706034ms)
-✔ malformed successful authentication response is not trusted (99.578815ms)
+✔ production worker fails closed without credentials (270.531752ms)
+✔ production hostname gate, Railway health probe, and unconfigured public staging (194.526643ms)
+✔ worker exit: all pending calls fail closed and timers clear (101.116898ms)
+✔ worker stall: all pending calls fail closed and timers clear (1515.181291ms)
+✔ worker malformed: all pending calls fail closed and timers clear (135.423194ms)
+✔ worker wrong-id: all pending calls fail closed and timers clear (119.220762ms)
+✔ worker partial: all pending calls fail closed and timers clear (107.816927ms)
+✔ worker oversize: all pending calls fail closed and timers clear (177.317312ms)
+✔ malformed successful authentication response is not trusted (140.494313ms)
 responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
-✔ eight-request queue rejects excess without response misrouting (312.918522ms)
+✔ eight-request queue rejects excess without response misrouting (315.024548ms)
 responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
-✔ HTTP health and protected requests never succeed after worker exit (180.936248ms)
+✔ HTTP health and protected requests never succeed after worker exit (141.871179ms)
 responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
-✔ HTTP health and protected requests never succeed after worker stall (1526.869213ms)
+✔ HTTP health and protected requests never succeed after worker stall (1534.968459ms)
 responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
-✔ HTTP health and protected requests never succeed after worker malformed (98.36404ms)
+✔ HTTP health and protected requests never succeed after worker malformed (125.543641ms)
 responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
-✔ shutdown immediately settles requests and reaps SIGTERM-ignoring child (18.245764ms)
-✔ spawn failure settles pending work without waiting for an exit event (15.52308ms)
+✔ shutdown immediately settles requests and reaps SIGTERM-ignoring child (29.012543ms)
+✔ spawn failure settles pending work without waiting for an exit event (5.556862ms)
 responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
-✔ contradictory unavailable/success envelope denied by worker layer (318.64287ms)
-✔ contradictory unavailable/success envelope denied by handler layer (16.795237ms)
-ℹ tests 18
+✔ contradictory unavailable/success envelope denied by worker layer (325.010179ms)
+✔ contradictory unavailable/success envelope denied by handler layer (14.032286ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ official legacy client 2025-11-25: exact negotiation, all nine tools and unchanged authorization (1079.871918ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ official legacy client 2025-06-18: exact negotiation, all nine tools and unchanged authorization (525.367019ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ official legacy client 2025-03-26: exact negotiation, all nine tools and unchanged authorization (612.545764ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ raw Muse-shaped requests negotiate statelessly; unsupported versions cannot execute (386.634802ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ modern and legacy clients share durable state without sharing transport identity (643.33567ms)
+ℹ tests 23
 ℹ suites 0
-ℹ pass 18
+ℹ pass 23
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 5297.722813
+ℹ duration_ms 5189.316334
