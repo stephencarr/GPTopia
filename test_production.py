@@ -15,7 +15,7 @@ class ProductionTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.db = str(Path(self.temp.name) / 'world.db')
         self.now = time.time()
-        self.grants = {'subject-pip': {'actor':'pip','control_domain':'pip-runtime','client_id':'pip-client','spaces':['pilot'], 'scopes':list(SCOPES.values()),'expires_at':self.now+600}}
+        self.grants = {'subject-pip': {'actor':'pip','control_domain':'pip-runtime','client_id':'pip-client','spaces':['pilot'], 'scopes':sorted(set(SCOPES.values())),'expires_at':self.now+600}}
         self.private = rsa.generate_private_key(public_exponent=65537,key_size=2048)
         keyclient = SimpleNamespace(get_signing_key_from_jwt=lambda token: SimpleNamespace(key=self.private.public_key()))
         self.verify = JWTVerifier('https://issuer.example/','https://world.example','https://issuer.example/jwks',self.grants,key_client=keyclient)
@@ -59,5 +59,45 @@ class ProductionTests(unittest.TestCase):
         def fixture(_):return Principal('pip','issuer','sub','controller',frozenset({'pilot'}),frozenset(SCOPES.values()),AUDIENCE,self.now+600,assurance='synthetic')
         with TestClient(create_app(self.db,verifier=fixture,deadline=self.now+600)) as c:
             self.assertEqual(c.post('/v1',headers={'Authorization':'Bearer synthetic'},json={}).status_code,401)
+
+    def test_malformed_admissions_fail_at_startup(self):
+        import copy
+        from production import validate_admissions
+        for field, value in [('client_id',None),('client_id',''),('actor',''),('control_domain',None),('spaces','pilot'),('spaces',[]),('scopes',['admin:all']),('expires_at',True),('expires_at',float('inf')),('expires_at',self.now+8*86400)]:
+            grants=copy.deepcopy(self.grants)
+            grants['subject-pip'][field]=value
+            with self.subTest(field=field,value=value), self.assertRaises(ValueError):
+                create_app(str(Path(self.temp.name)/'must-not-exist.db'),admissions=grants)
+            self.assertFalse(Path(self.temp.name,'must-not-exist.db').exists())
+        with self.assertRaises(ValueError):validate_admissions({'':self.grants['subject-pip']})
+        with self.assertRaises(ValueError):validate_admissions([])
+
+    def test_missing_client_claim_never_matches_null(self):
+        claims=dict(self.claims)
+        claims.pop('azp')
+        self.grants['subject-pip']['client_id']=None
+        with self.assertRaises(AuthenticationError):
+            self.verify(jwt.encode(claims,self.private,algorithm='RS256'))
+
+    def test_resource_and_url_validation(self):
+        from production import resource_origin, https_url
+        for url in ['https://world.example/', 'https://world.example/api', 'http://world.example', 'https://world.example?x=1', 'https://world.example/#x', 'https://user@world.example', 'https://world.example\\evil', 'https://world.example\n']:
+            with self.subTest(url=url), self.assertRaises(ValueError):resource_origin(url)
+        for url in [None,'', 'https://world.example:bad', 'https://world.example:0']:
+            with self.assertRaises(ValueError):https_url(url)
+        with self.client(False) as c:
+            response=c.post('/v1',json={})
+            url=response.headers['www-authenticate'].split('"')[1]
+            self.assertEqual(c.get(url).status_code,200)
+
+    def test_closed_pilot_skips_verification(self):
+        from unittest.mock import patch
+        def forbidden(_):raise AssertionError('must not verify after deadline')
+        app=create_app(self.db,verifier=forbidden,deadline=self.now+600)
+        with TestClient(app) as c, patch('production.time.time',return_value=self.now+601):
+            response=c.post('/v1',headers={'Authorization':'Bearer synthetic'},json={})
+            self.assertEqual(response.status_code,403)
+            self.assertEqual(response.json()['error']['code'],'pilot_closed')
+            self.assertEqual(c.get('/healthz').status_code,200)
 
 if __name__=='__main__':unittest.main()

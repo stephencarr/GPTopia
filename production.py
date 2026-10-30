@@ -1,6 +1,7 @@
 """Deny-by-default HTTPS resource boundary. Not an MCP implementation or OAuth issuer."""
 import asyncio
 import json
+import math
 import os
 import sqlite3
 import time
@@ -17,11 +18,55 @@ from identity import AUDIENCE, AuthenticationError, Principal, SCOPES
 from kernel import Kernel, MAX_BODY, SCHEMA
 
 
+def bounded_text(value, maximum=200):
+    return isinstance(value, str) and 0 < len(value) <= maximum and not any(ord(c) <= 32 or ord(c) == 127 for c in value)
+
+
 def https_url(value):
+    if not bounded_text(value, 2048):
+        raise ValueError('canonical HTTPS URL required')
     p = urlsplit(value)
-    if p.scheme != 'https' or not p.hostname or p.username or p.password or p.query or p.fragment:
+    if (p.scheme != 'https' or not p.hostname or p.username or p.password
+            or p.query or p.fragment or '\\' in value or p.port == 0):
         raise ValueError('canonical HTTPS URL required')
     return value
+
+
+def resource_origin(value):
+    https_url(value)
+    p = urlsplit(value)
+    if p.path or value != 'https://' + p.netloc:
+        raise ValueError('resource must be an HTTPS origin without path or trailing slash')
+    return value
+
+
+def validate_admissions(admissions):
+    """Validate trusted configuration before any database initialization or serving."""
+    from kernel import IDENT
+    if not isinstance(admissions, dict) or len(admissions) > 10:
+        raise ValueError('admissions must be a bounded subject mapping')
+    actors = set()
+    now = time.time()
+    for subject, grant in admissions.items():
+        if not bounded_text(subject) or not isinstance(grant, dict):
+            raise ValueError('invalid admission subject or grant')
+        for field in ['actor', 'control_domain', 'client_id']:
+            if not bounded_text(grant.get(field)):
+                raise ValueError('invalid admission identity binding')
+        if not IDENT.fullmatch(grant['actor']) or grant['actor'] in actors:
+            raise ValueError('invalid or duplicate actor')
+        actors.add(grant['actor'])
+        for field in ['spaces', 'scopes']:
+            values = grant.get(field)
+            if (not isinstance(values, list) or not 0 < len(values) <= 20
+                    or not all(bounded_text(v) for v in values) or len(values) != len(set(values))):
+                raise ValueError('invalid admission scope list')
+        if any(not IDENT.fullmatch(v) for v in grant['spaces']) or not set(grant['scopes']) <= set(SCOPES.values()):
+            raise ValueError('unknown scopes or malformed spaces')
+        expiry = grant.get('expires_at')
+        if type(expiry) not in (int, float) or not math.isfinite(expiry) or not now < expiry <= now + 7*86400:
+            raise ValueError('admission expiry must be within seven days')
+    return admissions
 
 
 class JWTVerifier:
@@ -32,9 +77,12 @@ class JWTVerifier:
     access token lifetime capped at one hour; grant expiry capped externally.
     """
     def __init__(self, issuer, resource, jwks_url, admissions, client_claim='azp', key_client=None):
-        self.issuer, self.resource = https_url(issuer), https_url(resource)
+        self.issuer, self.resource = https_url(issuer), resource_origin(resource)
+        https_url(jwks_url)
+        if not bounded_text(client_claim):
+            raise ValueError('invalid client claim name')
         self.client_claim = client_claim
-        self.admissions = admissions
+        self.admissions = validate_admissions(admissions)
         self.keys = key_client or jwt.PyJWKClient(https_url(jwks_url), cache_keys=False, lifespan=60, timeout=3)
 
     def __call__(self, token):
@@ -43,12 +91,14 @@ class JWTVerifier:
             c = jwt.decode(token, key, algorithms=['RS256'], audience=self.resource, issuer=self.issuer,
                            options={'require': ['exp', 'iat', 'iss', 'sub', 'aud']})
             now = time.time()
-            if not isinstance(c['iat'], (int, float)) or not isinstance(c['exp'], (int, float)) or c['exp'] - c['iat'] > 3600:
+            if (type(c['iat']) not in (int, float) or type(c['exp']) not in (int, float)
+                    or not math.isfinite(c['iat']) or not math.isfinite(c['exp']) or not 0 < c['exp'] - c['iat'] <= 3600):
                 raise ValueError('token lifetime')
             if not isinstance(c.get('scope'), str):
                 raise ValueError('scope')
             grant = self.admissions.get(c['sub'])
-            if not grant or c.get(self.client_claim) != grant['client_id'] or not now < grant['expires_at']:
+            if (not grant or not bounded_text(c.get(self.client_claim)) or not bounded_text(grant.get('client_id'))
+                    or c[self.client_claim] != grant['client_id'] or not now < grant['expires_at']):
                 raise ValueError('not admitted')
             return Principal(grant['actor'], self.issuer, c['sub'], grant['control_domain'],
                              frozenset(grant['spaces']), frozenset(c['scope'].split()) & frozenset(grant['scopes']),
@@ -59,11 +109,13 @@ class JWTVerifier:
 
 def create_app(db_path, resource=None, issuer=None, verifier=None, admissions=None, deadline=0):
     """No verifier/deadline means all application routes deny, health stays live."""
-    admissions = admissions or {}
-    if resource:
-        https_url(resource)
-    if issuer:
+    admissions = validate_admissions({} if admissions is None else admissions)
+    if resource is not None:
+        resource_origin(resource)
+    if issuer is not None:
         https_url(issuer)
+    if type(deadline) not in (int, float) or not math.isfinite(deadline):
+        raise ValueError('invalid pilot deadline')
     if deadline and (not time.time() < deadline <= time.time() + 7*86400):
         raise ValueError('pilot deadline must be within seven days')
     kernel = Kernel(db_path, max_mutations=100, max_objects=10, allow_fixture=False)
@@ -94,6 +146,9 @@ def create_app(db_path, resource=None, issuer=None, verifier=None, admissions=No
             return JSONResponse({'status': 'ok'}, headers={'Cache-Control': 'no-store'})
         if request.url.path == '/.well-known/oauth-protected-resource' and request.method == 'GET' and resource and issuer:
             return JSONResponse({'resource': resource, 'authorization_servers': [issuer], 'scopes_supported': sorted(set(SCOPES.values()))})
+        # Closed pilots do not perform token verification or outbound JWKS work.
+        if deadline and not time.time() < deadline:
+            return reply(403, 'pilot_closed')
         # Authenticate before path routing, payload read or database writes.
         if request.headers.get('origin') or request.headers.get('x-test-actor'):
             return reply(401, 'unauthenticated')
