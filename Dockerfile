@@ -16,9 +16,9 @@ COPY --from=node-deps /usr/local/bin/node /usr/local/bin/node
 WORKDIR /app
 COPY requirements-production.txt ./
 RUN pip install --no-cache-dir -r requirements-production.txt
-COPY identity.py kernel.py production.py adapter-contract.json ./
+COPY identity.py kernel.py production.py adapter-contract.json container_entrypoint.py ./
 COPY mcp_adapter/server.mjs mcp_adapter/worker.py ./mcp_adapter/
 COPY --from=node-deps /build/node_modules ./mcp_adapter/node_modules
 USER 10001:10001
 EXPOSE 8080
-CMD ["node", "mcp_adapter/server.mjs"]
+CMD ["/usr/local/bin/python", "-I", "/app/container_entrypoint.py"]

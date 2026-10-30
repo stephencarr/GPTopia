@@ -11,3 +11,4 @@ mcp_adapter/*
 !mcp_adapter/package-lock.json
 !mcp_adapter/server.mjs
 !mcp_adapter/worker.py
+!container_entrypoint.py

@@ -78,3 +78,39 @@ Generic health now checks that the private worker finished initialization and
 responds. An unwritable mounted `/data` fails health503 rather than reporting a
 healthy MCP bridge. Do not fix a volume failure by switching the application to
 root; repair the approved volume's UID10001 write permissions explicitly.
+
+## Narrow mounted-volume initialization (local prepared change)
+
+The container command is now the fixed isolated Python entrypoint
+`/usr/local/bin/python -I /app/container_entrypoint.py`. Docker still defaults to
+UID/GID10001. An approved Railway runtime UID0 override may be used solely to
+initialize a fresh root-owned volume: no network listener starts until the
+initializer permanently drops real, effective **and saved** GID/UID to10001 and
+clears supplementary groups. Application exec uses a fixed absolute Node path
+and fixed arguments; no user-supplied command or chown path is supported.
+
+The initializer accepts only `/data/world.sqlite3`, opens `/data` without
+following symlinks, validates existing entries before mutation, and changes only
+the directory's ownership/mode to10001:10001/0700. Existing SQLite DB/WAL/SHM must
+already be regular, single-link, non-group/world-writable files owned10001:10001.
+Symlinks, hardlinks, foreign/root-owned files, and unknown entries are refused;
+no recursive chown or automatic data-file repair occurs. Unknown volume entries
+(including lost+found) need separately reviewed handling rather than silently
+expanding startup authority. Application umask is077. Failed checks/drop prevent
+exec and emit only a generic refusal, without environment/credential logging.
+
+Local verification:13 initializer tests combine real unprivileged filesystem
+checks with **mocked** root-owned mount and privileged syscall sequences. The
+executor is UID1000 and has no container engine: actual root initialization,
+setresuid/setresgid and Railway-mounted-volume behavior are **not yet tested**.
+Independent review and an observed nonroot application process remain required
+before accepting hosted readiness. Parent/deployment worker owns any runtime
+UID override and source activation; this increment performs no external mutation.
+
+Railway explicitly documents `RAILWAY_RUN_UID=0` as the service variable overriding
+an image's nonroot startup UID for mounted-volume access. It changes startup UID,
+not an identity-provider credential or occupant grant. In this design the fixed
+entrypoint drops privilege before networking. Only parent/deployment operator may
+activate it after review; no variable was set by this implementation task.
+[Official volume permissions](https://docs.railway.com/volumes),
+[official runtime variable](https://docs.railway.com/variables/reference).
