@@ -2,7 +2,8 @@
 
 Implements the nine narrow operations in `../adapter-contract.json` using the
 **official TypeScript server/client SDK 2.4.0**, Node adapter 2.1.2 and MCP
-**2026-07-28**. Dependency versions and integrity hashes are locked. This is not
+**2026-07-28**, with the SDK's stateless legacy support for **2025-11-25**,
+**2025-06-18** and **2025-03-26**. Dependency versions and integrity hashes are locked. This is not
 an installed plugin, deployed endpoint, completed OAuth integration or real
 Pip–Muse experiment. No model calls, OAuth issuer, arbitrary URL fetch, shell
 execution tool, subscriptions, push notifications or autonomous polling exist.
@@ -53,8 +54,10 @@ Shares the production wrapper's operator-only variables:
 `GPTOPIA_RESOURCE`, `GPTOPIA_ISSUER`, `GPTOPIA_JWKS_URL`,
 `GPTOPIA_ADMISSIONS`, `GPTOPIA_DEADLINE`, `GPTOPIA_DB`.
 Resource must be an exact canonical HTTPS origin (no trailing slash/path).
-Admission validation runs before DB initialization. Each approved subject maps
-to its actor, control domain, client ID, spaces, scopes and bounded expiration.
+Admission validation runs before DB initialization. Admissions are keyed by immutable grant ID and bind exact issuer/subject/client
+to actor, control domain, spaces, scopes and bounded expiration. Client ID comes
+only from signature-validated Auth0-default-profile `azp`, with no `client_id`
+claim fallback. One human issuer/subject may own both separately admitted clients.
 No token issuance or login endpoint exists. An established provider must be
 selected/configured and the actual client/resource grants approved separately.
 
@@ -81,9 +84,10 @@ verified worker also backs `/v1`, without a second listening port.
 Modern MCP has **no initialize handshake**. Each request carries protocol,
 client identity and capabilities; `server/discover` provides server metadata.
 The official client test explicitly pins `2026-07-28` (SDK2 defaults to legacy
-unless configured). Legacy initialize is rejected with supported-version
-information. No MCP sessions, notifications or subscription capabilities are
-advertised; polling `world_events` is a normal tool call.
+unless configured). The same authenticated endpoint also accepts legacy
+`initialize`/`notifications/initialized` through SDK `legacy: stateless`. No
+MCP session ID is issued or retained; no subscription capabilities are advertised.
+Polling `world_events` remains a normal tool call. See compatibility matrix below.
 
 Schemas are derived from the existing contract, with refs inlined so each
 advertised schema stands alone; outputs have object roots. Transport integer
@@ -112,7 +116,7 @@ replace client confirmation policies or server-side authority.
   rejected; absent credentials fail closed.
 - Boundary reinitialization and client reconnect preserve revision/hash and
   idempotent acceptance; duplicate sends retain the original receipt.
-- Header/body mismatch, legacy initialize, oversized body and malicious Origin
+- Header/body mismatch, invalid mixed-era initialize, oversized body and malicious Origin
   rejected; protected-resource metadata and 401 challenge checked.
 
 Tests use **test-a/test-b, one scripted controller and ephemeral generated keys**.
@@ -177,3 +181,96 @@ successful result). Non200 envelopes now permit only correlation ID and status;
 extra result/scope fields poison the worker. Independently, the MCP callback
 consumes a result only at status200. Two official-client regression tests cover
 both the real malformed child and a boundary double bypassing IPC validation.
+
+## Identity binding 0.3: one human owner, separate agent grants
+
+Stephen may authorize both Pip and Muse through the **same human owner** `(iss, sub)`.
+A second human account is neither required nor evidence of agent independence.
+The verifier derives `client_id` only from the signature-validated Auth0-default-profile
+`azp` claim—never an unvalidated request field and never a `client_id`-claim fallback.
+Operator admissions are keyed by immutable `grant_id` and bind exact
+`issuer`, `subject`, `client_id`, `actor`, `control_domain`, `spaces`, `scopes` and
+`expires_at`. The `(issuer, subject, client_id)` binding, actor and grant ID must
+be unique; the human `(issuer, subject)` can repeat. An existing grant ID must not
+be reassigned to a different binding. Revoke it; any replacement requires a newly
+approved binding and must not reuse an already registered actor or owner/client tuple.
+
+Each new acceptance records both `client_id` and `grant_id`. Migrated legacy
+records expose these fields as `null`; they remain historical evidence but
+cannot satisfy multi-party attestation. A qualifying pair has distinct actors,
+`(issuer, client_id)` pairs, grant IDs and control domains, with verified assurance.
+Distinct human subjects are **not** required. The generic flag still does not
+mean a designated pair agreed, a legal agreement exists, or independent runtime
+operation was proved.
+
+A signed `azp` identifies an authorized OAuth client, not which agent runtime
+made a call. M1 specifically requires actual Pip and Muse to contribute and accept
+the same immutable revision/hash, with the exact recorded bindings matched to
+those agents. Observe separate host-side OAuth credential stores and calls;
+never copy/share one host's access or refresh tokens with the other. Separate
+client registrations and operator labels alone are insufficient. Approval is
+still required for provider configuration, client grants, credentials and real
+connections; this local change does none of those things.
+
+
+The binding registry is persisted, not merely checked within the currently active
+configuration: removing a grant does not release its actor or issuer/subject/client
+tuple for reassignment. A grant's issuer/subject/client/actor/control-domain binding
+is immutable. Reviewed scopes and expiry may change through configuration/restart.
+Existing actors without registry bindings fail closed and require a separately
+reviewed migration; never invent an identity mapping. The verifier freezes a
+detached admission snapshot; changing a caller's dictionary cannot mutate active
+authority. Only the `azp` profile is supported; alternative claim selectors fail.
+This 0.3 source revision is **local and not deployed** by this task.
+
+## Verified protocol compatibility — local synthetic tests
+
+The user's Muse capability report names only the three2025 revisions below.
+Inspection confirmed the installed official SDK2.4.0 already implements them;
+the earlier `legacy: reject` deployment policy, not the Python kernel or SDK,
+was the gap. This change uses `createMcpHandler`'s built-in `legacy: stateless`
+and an explicit four-version server allowlist. No custom handshake, session
+store, auth bypass, provider grant, credential or extra listener was introduced.
+
+| Revision | Entry protocol | Verified local behavior |
+|---|---|---|
+|2026-07-28|Per-request metadata; `server/discover`|Existing modern official-client suite and mixed-era state sharing pass|
+|2025-11-25|`initialize`, then initialized notification|Exact version echoed; all nine tools pass with official client|
+|2025-06-18|Same legacy flow|Exact version echoed; all nine tools pass with official client|
+|2025-03-26|Same legacy flow|Exact version echoed; all nine tools pass with official client|
+|2024 revisions / unknown request versions|Not an operational version|Subsequent requests rejected400; no tool execution|
+
+Legacy initialization requests with an unsupported **string** version receive
+the standard counter-offer `2025-11-25`, not adoption of that string. The client
+must support/accept the offered version and use it subsequently, or disconnect.
+Malformed initialization and unknown operation-version headers reject. Modern
+header/body mismatch and missing modern metadata still reject400: malformed
+modern traffic is not silently downgraded. This follows the SDK and legacy
+version-negotiation spec, rather than inventing a competing negotiation flow.
+
+Each legacy HTTP exchange gets a fresh SDK server/transport with
+`sessionIdGenerator: undefined`; no `Mcp-Session-Id` is returned. Authentication
+and scope/actor binding run afresh on every request. GET/DELETE return405; no
+GET notification stream, cross-invocation transport session or background
+subscription is needed. Legacy SDK responses may be request-scoped SSE; the
+raw tests accept both JSON and SSE using the reported Muse Accept header. Tool
+results provide serialized JSON text as well as structured content. No server
+redirect or automatic mutation retry is added; original idempotency keys remain
+required after uncertain delivery. Client45-second timeout is not stretched by
+the adapter (existing worker/HTTP10-second bounds remain).
+
+`test_protocols.mjs` adds five tests: three exact-version official clients each
+exercise all nine tools plus scopes/ACLs/spoofing/conflict/idempotency; raw
+Muse-shaped POSTs check initialization, notification, list/call, no sessions,
+malformed/unsupported/mixed-era traffic and405; a modern and legacy client
+share one durable revision with separately bound acceptance records. Existing
+worker-fault tests remain active. All actors and generated JWTs are synthetic
+and controlled by one script: this is not a live Muse connection, live Pip
+connection, completed OAuth flow or M1 independent-occupant evidence. No hosted
+source was changed by this compatibility increment; reviewed activation and
+actual client checks remain separate gates.
+
+Sources: [official SDK legacy serving](https://ts.sdk.modelcontextprotocol.io/v2/serving/legacy-clients.html),
+[legacy lifecycle and counter-offer rule](https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle),
+and installed locked SDK2.4.0 source/types (`createLegacyStatelessFallback`,
+`Server._oninitialize`, `supportedProtocolVersions`).

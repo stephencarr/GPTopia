@@ -13,7 +13,7 @@ def run():
         kernel.initialize()
         principals = {actor: Principal(actor, 'synthetic-demo', actor, 'test-control-' + actor,
                        frozenset({'plaza'}), frozenset(SCOPES.values()), AUDIENCE,
-                       time.time() + 60, assurance='synthetic') for actor in ['alice', 'bob']}
+                       time.time() + 60, assurance='synthetic', client_id='test-client-' + actor, grant_id='test-grant-' + actor) for actor in ['alice', 'bob']}
         def call(actor, op, key=None, **args):
             request = {'op': op, 'args': {'space': 'plaza', **args}}
             if key:

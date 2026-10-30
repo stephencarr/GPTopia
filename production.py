@@ -6,6 +6,7 @@ import os
 import sqlite3
 import time
 from pathlib import Path
+from types import MappingProxyType
 from urllib.parse import urlsplit
 
 import jwt
@@ -15,7 +16,7 @@ from starlette.responses import JSONResponse
 from starlette.routing import Route
 
 from identity import AUDIENCE, AuthenticationError, Principal, SCOPES
-from kernel import Kernel, MAX_BODY, SCHEMA
+from kernel import Kernel, MAX_BODY, initialize_schema
 
 
 def bounded_text(value, maximum=200):
@@ -44,18 +45,27 @@ def validate_admissions(admissions):
     """Validate trusted configuration before any database initialization or serving."""
     from kernel import IDENT
     if not isinstance(admissions, dict) or len(admissions) > 10:
-        raise ValueError('admissions must be a bounded subject mapping')
-    actors = set()
+        raise ValueError('admissions must be a bounded grant-ID mapping')
+    actors, bindings = set(), set()
     now = time.time()
-    for subject, grant in admissions.items():
-        if not bounded_text(subject) or not isinstance(grant, dict):
-            raise ValueError('invalid admission subject or grant')
+    for grant_id, grant in admissions.items():
+        if not isinstance(grant_id, str) or not IDENT.fullmatch(grant_id) or not isinstance(grant, dict):
+            raise ValueError('invalid admission grant ID or grant')
+        if set(grant) != {'issuer', 'subject', 'client_id', 'actor', 'control_domain', 'spaces', 'scopes', 'expires_at'}:
+            raise ValueError('explicit issuer/subject/client grant binding required')
+        if not bounded_text(grant.get('issuer')) or not bounded_text(grant.get('subject')):
+            raise ValueError('invalid admission owner binding')
+        https_url(grant['issuer'])
         for field in ['actor', 'control_domain', 'client_id']:
             if not bounded_text(grant.get(field)):
                 raise ValueError('invalid admission identity binding')
         if not IDENT.fullmatch(grant['actor']) or grant['actor'] in actors:
             raise ValueError('invalid or duplicate actor')
         actors.add(grant['actor'])
+        binding = (grant['issuer'], grant['subject'], grant['client_id'])
+        if binding in bindings:
+            raise ValueError('duplicate issuer/subject/client binding')
+        bindings.add(binding)
         for field in ['spaces', 'scopes']:
             values = grant.get(field)
             if (not isinstance(values, list) or not 0 < len(values) <= 20
@@ -69,6 +79,40 @@ def validate_admissions(admissions):
     return admissions
 
 
+def register_admissions(db, admissions):
+    """Local operator registry: never silently reassign a historical actor or grant."""
+    validate_admissions(admissions)
+    db.executescript("""
+    CREATE TABLE IF NOT EXISTS admission_bindings (
+      grant_id TEXT PRIMARY KEY, actor TEXT NOT NULL UNIQUE, issuer TEXT NOT NULL,
+      subject TEXT NOT NULL, client_id TEXT NOT NULL, control_domain TEXT NOT NULL,
+      UNIQUE(issuer,subject,client_id));
+    CREATE TRIGGER IF NOT EXISTS admission_binding_no_update BEFORE UPDATE ON admission_bindings
+      BEGIN SELECT RAISE(ABORT,'immutable admission binding'); END;
+    CREATE TRIGGER IF NOT EXISTS admission_binding_no_delete BEFORE DELETE ON admission_bindings
+      BEGIN SELECT RAISE(ABORT,'immutable admission binding'); END;
+    """)
+    db.execute('BEGIN IMMEDIATE')
+    try:
+        for gid, grant in admissions.items():
+            values = (gid, grant['actor'], grant['issuer'], grant['subject'], grant['client_id'], grant['control_domain'])
+            previous = db.execute('SELECT grant_id,actor,issuer,subject,client_id,control_domain FROM admission_bindings WHERE grant_id=?', (gid,)).fetchone()
+            if previous is not None:
+                if tuple(previous) != values:
+                    raise ValueError('admission grant rebinding forbidden')
+            else:
+                if db.execute('SELECT 1 FROM identities WHERE id=?', (grant['actor'],)).fetchone():
+                    raise ValueError('existing actor has no matching immutable admission binding')
+                db.execute('INSERT INTO admission_bindings VALUES (?,?,?,?,?,?)', values)
+            db.execute('INSERT OR IGNORE INTO identities VALUES (?,?)', (grant['actor'], '[]'))
+            for space in grant['spaces']:
+                db.execute('INSERT OR IGNORE INTO members VALUES (?,?)', (space, grant['actor']))
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+
 class JWTVerifier:
     """Only approved issuer keys and operator-maintained admission grant trusted.
 
@@ -79,30 +123,41 @@ class JWTVerifier:
     def __init__(self, issuer, resource, jwks_url, admissions, client_claim='azp', key_client=None):
         self.issuer, self.resource = https_url(issuer), resource_origin(resource)
         https_url(jwks_url)
-        if not bounded_text(client_claim):
-            raise ValueError('invalid client claim name')
-        self.client_claim = client_claim
-        self.admissions = validate_admissions(admissions)
+        if client_claim != 'azp':
+            raise ValueError('only Auth0 default access-token profile signed azp is supported')
+        validated = validate_admissions(admissions)
+        if any(g['issuer'] != self.issuer for g in validated.values()):
+            raise ValueError('admission issuer differs from configured issuer')
+        # Freeze a detached snapshot; configuration changes require reviewed restart.
+        self.admissions = MappingProxyType({gid: MappingProxyType({k: tuple(v) if isinstance(v, list) else v
+                                       for k, v in g.items()}) for gid, g in validated.items()})
+        self.bindings = MappingProxyType({(g['issuer'], g['subject'], g['client_id']): (gid, g)
+                                         for gid, g in self.admissions.items()})
         self.keys = key_client or jwt.PyJWKClient(https_url(jwks_url), cache_keys=False, lifespan=60, timeout=3)
 
     def __call__(self, token):
         try:
             key = self.keys.get_signing_key_from_jwt(token).key
             c = jwt.decode(token, key, algorithms=['RS256'], audience=self.resource, issuer=self.issuer,
-                           options={'require': ['exp', 'iat', 'iss', 'sub', 'aud']})
+                           options={'require': ['exp', 'iat', 'iss', 'sub', 'aud', 'azp']})
             now = time.time()
             if (type(c['iat']) not in (int, float) or type(c['exp']) not in (int, float)
                     or not math.isfinite(c['iat']) or not math.isfinite(c['exp']) or not 0 < c['exp'] - c['iat'] <= 3600):
                 raise ValueError('token lifetime')
             if not isinstance(c.get('scope'), str):
                 raise ValueError('scope')
-            grant = self.admissions.get(c['sub'])
-            if (not grant or not bounded_text(c.get(self.client_claim)) or not bounded_text(grant.get('client_id'))
-                    or c[self.client_claim] != grant['client_id'] or not now < grant['expires_at']):
+            if not bounded_text(c.get('sub')) or not bounded_text(c.get('azp')):
+                raise ValueError('missing owner/client binding')
+            match = self.bindings.get((c['iss'], c['sub'], c['azp']))
+            if not match:
+                raise ValueError('not admitted')
+            grant_id, grant = match
+            if not now < grant['expires_at']:
                 raise ValueError('not admitted')
             return Principal(grant['actor'], self.issuer, c['sub'], grant['control_domain'],
                              frozenset(grant['spaces']), frozenset(c['scope'].split()) & frozenset(grant['scopes']),
-                             AUDIENCE, min(c['exp'], grant['expires_at']), assurance='verified')
+                             AUDIENCE, min(c['exp'], grant['expires_at']), assurance='verified',
+                             client_id=c['azp'], grant_id=grant_id)
         except Exception:
             raise AuthenticationError('invalid credentials') from None
 
@@ -121,16 +176,10 @@ def create_app(db_path, resource=None, issuer=None, verifier=None, admissions=No
     kernel = Kernel(db_path, max_mutations=100, max_objects=10, allow_fixture=False)
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     with kernel.connection() as db:
-        db.executescript(SCHEMA)
+        initialize_schema(db)
+        register_admissions(db, admissions)
         db.execute('CREATE TABLE IF NOT EXISTS request_budget (id INTEGER PRIMARY KEY CHECK(id=1), used INTEGER NOT NULL)')
         db.execute('INSERT OR IGNORE INTO request_budget VALUES (1,0)')
-        for grant in admissions.values():
-            # Admission is operator configuration, never client JSON.
-            from kernel import name
-            actor = name(grant['actor'], 'actor')
-            db.execute('INSERT OR IGNORE INTO identities VALUES (?,?)', (actor, '[]'))
-            for space in grant['spaces']:
-                db.execute('INSERT OR IGNORE INTO members VALUES (?,?)', (name(space, 'space'), actor))
         db.commit()
     lock = asyncio.Lock()
     auth_window = [time.monotonic(), 0]

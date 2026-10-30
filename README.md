@@ -64,7 +64,7 @@ Fixtures: `alice` declares `design`; `bob` declares `review`; `eve` declares `ob
 }
 ```
 
-Use the returned object `id` and `version` for `get` or `update`. Every mutation (`create`, `update`, `send`) requires a new idempotency key; reuse that key only for an identical retry. A changed request with the same key conflicts. Reads return `{"ok":true,"result":...}`; failures return `{"ok":false,"error":{"code":...,"message":...}}`.
+Use the returned object `id` and `version` for `get` or `update`. Every mutation (`create`, `update`, `send`, `accept`) requires a new idempotency key; reuse that key only for an identical retry. A changed request with the same key conflicts. Reads return `{"ok":true,"result":...}`; failures return `{"ok":false,"error":{"code":...,"message":...}}`.
 
 For `events`, `inbox` and `history`, start `after` at `0`, then retain and send the returned `next_cursor`. Cursors are **exclusive**. `history` cursors are object version numbers; event and inbox cursors are global event sequence numbers. Never exchange cursor types or spaces. An empty page can advance a cursor past inaccessible records. Poll again for later work. Event payloads contain references, not object/message content; fetch authorized content separately. Message delivery is durable insertion, not an exactly-once consumer acknowledgment.
 
@@ -83,26 +83,70 @@ Recorded local verification: **27 tests passed**. Run evidence is in `evidence/t
 
 See [`ARCHITECTURE.md`](ARCHITECTURE.md) for decisions and the next experiment. A passing two-client smoke run establishes a **kernel/protocol proof**, not an agent society, autonomous collaboration, or production security.
 
-## Local checkpoint 0.2: identity seam and acceptance
+## Identity and exact-revision acceptance
 
 See [CHANGELOG.md](CHANGELOG.md). The default programmatic kernel now requires a
 trusted `Principal`; the server fails closed unless an injected verifier or
-explicit insecure fixture mode is selected. **There is no production verifier.**
-`identity.py` checks claims supplied by a trusted adapter; it does not validate
-OAuth tokens, signatures or provider revocation. CLI commands above stay fixtures.
+explicit insecure fixture mode is selected. `identity.py` checks trusted claims;
+`production.py` supplies the PyJWT-based verifier for approved provider configuration.
+That implementation is not evidence of an actual OAuth connection or provider-side
+revocation. CLI commands above stay fixtures.
 
 `accept` records a principal's explicit acceptance of the current exact object
 `version` and `content_sha256`. Later edits do not inherit acceptance. Read/history
 include revision hashes and acceptance records. Synthetic records can establish
 only `test_multi_party_attested`, never production `multi_party_attested`. The verified
-predicate is any two read-authorized principals with distinct actor/subject/control
-attribution—not unanimity, required-owner approval or proof of independent agents.
+predicate uses distinct agent-client/grant/actor/control attribution, not distinct
+human owners—not unanimity, required-owner approval or proof of independent agents.
 
-Run `python demo_acceptance.py` for the synthetic demonstration. The proposed
-[adapter runbook](ADAPTER_RUNBOOK.md) and [tool contract](adapter-contract.json)
-are documentation only; no dot plugin or Muse connection is installed.
+Run `python demo_acceptance.py` for the synthetic demonstration. The [adapter runbook](ADAPTER_RUNBOOK.md) and [tool contract](adapter-contract.json)
+describe the locally implemented adapter and remaining real-connection gates.
+Implementation alone does not establish a working dot plugin or Muse connection.
 
 Checkpoint 0.2 verification: **41 stdlib tests passed**, plus **50 schema checks**
 against actual operation requests/responses. `python validate_contracts.py` is an
 optional extra check requiring `jsonschema`; the kernel, demos and unittest suite
 remain standard-library-only. New evidence lives in `evidence/checkpoint-02/`.
+
+## Identity binding 0.3: one human owner, separate agent grants
+
+Stephen may authorize both Pip and Muse through the **same human owner** `(iss, sub)`.
+A second human account is neither required nor evidence of agent independence.
+The verifier derives `client_id` only from the signature-validated Auth0-default-profile
+`azp` claim—never an unvalidated request field and never a `client_id`-claim fallback.
+Operator admissions are keyed by immutable `grant_id` and bind exact
+`issuer`, `subject`, `client_id`, `actor`, `control_domain`, `spaces`, `scopes` and
+`expires_at`. The `(issuer, subject, client_id)` binding, actor and grant ID must
+be unique; the human `(issuer, subject)` can repeat. An existing grant ID must not
+be reassigned to a different binding. Revoke it; any replacement requires a newly
+approved binding and must not reuse an already registered actor or owner/client tuple.
+
+Each new acceptance records both `client_id` and `grant_id`. Migrated legacy
+records expose these fields as `null`; they remain historical evidence but
+cannot satisfy multi-party attestation. A qualifying pair has distinct actors,
+`(issuer, client_id)` pairs, grant IDs and control domains, with verified assurance.
+Distinct human subjects are **not** required. The generic flag still does not
+mean a designated pair agreed, a legal agreement exists, or independent runtime
+operation was proved.
+
+A signed `azp` identifies an authorized OAuth client, not which agent runtime
+made a call. M1 specifically requires actual Pip and Muse to contribute and accept
+the same immutable revision/hash, with the exact recorded bindings matched to
+those agents. Observe separate host-side OAuth credential stores and calls;
+never copy/share one host's access or refresh tokens with the other. Separate
+client registrations and operator labels alone are insufficient. Approval is
+still required for provider configuration, client grants, credentials and real
+connections; this local change does none of those things.
+
+See [DEPLOYMENT.md](DEPLOYMENT.md#synthetic-admission-format-03) for a synthetic-only grant format.
+
+
+The binding registry is persisted, not merely checked within the currently active
+configuration: removing a grant does not release its actor or issuer/subject/client
+tuple for reassignment. A grant's issuer/subject/client/actor/control-domain binding
+is immutable. Reviewed scopes and expiry may change through configuration/restart.
+Existing actors without registry bindings fail closed and require a separately
+reviewed migration; never invent an identity mapping. The verifier freezes a
+detached admission snapshot; changing a caller's dictionary cannot mutate active
+authority. Only the `azp` profile is supported; alternative claim selectors fail.
+This 0.3 source revision is **local and not deployed** by this task.

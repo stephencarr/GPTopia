@@ -15,7 +15,7 @@ class ProductionTests(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.db = str(Path(self.temp.name) / 'world.db')
         self.now = time.time()
-        self.grants = {'subject-pip': {'actor':'pip','control_domain':'pip-runtime','client_id':'pip-client','spaces':['pilot'], 'scopes':sorted(set(SCOPES.values())),'expires_at':self.now+600}}
+        self.grants = {'grant-pip': {'issuer':'https://issuer.example/','subject':'subject-pip','actor':'pip','control_domain':'pip-runtime','client_id':'pip-client','spaces':['pilot'], 'scopes':sorted(set(SCOPES.values())),'expires_at':self.now+600}}
         self.private = rsa.generate_private_key(public_exponent=65537,key_size=2048)
         keyclient = SimpleNamespace(get_signing_key_from_jwt=lambda token: SimpleNamespace(key=self.private.public_key()))
         self.verify = JWTVerifier('https://issuer.example/','https://world.example','https://issuer.example/jwks',self.grants,key_client=keyclient)
@@ -36,8 +36,9 @@ class ProductionTests(unittest.TestCase):
             with self.assertRaises(AuthenticationError): self.verify(self.token(**changes))
         wrong = rsa.generate_private_key(public_exponent=65537,key_size=2048)
         with self.assertRaises(AuthenticationError): self.verify(jwt.encode(self.claims,wrong,algorithm='RS256'))
-        self.grants['subject-pip']['expires_at'] = self.now-1
-        with self.assertRaises(AuthenticationError): self.verify(self.token())
+        from unittest.mock import patch
+        with patch('production.time.time', return_value=self.now+601), self.assertRaises(AuthenticationError):
+            self.verify(self.token())
     def test_authenticated_and_spoof_denial(self):
         with self.client() as c:
             h={'Authorization':'Bearer '+self.token()}
@@ -65,17 +66,17 @@ class ProductionTests(unittest.TestCase):
         from production import validate_admissions
         for field, value in [('client_id',None),('client_id',''),('actor',''),('control_domain',None),('spaces','pilot'),('spaces',[]),('scopes',['admin:all']),('expires_at',True),('expires_at',float('inf')),('expires_at',self.now+8*86400)]:
             grants=copy.deepcopy(self.grants)
-            grants['subject-pip'][field]=value
+            grants['grant-pip'][field]=value
             with self.subTest(field=field,value=value), self.assertRaises(ValueError):
                 create_app(str(Path(self.temp.name)/'must-not-exist.db'),admissions=grants)
             self.assertFalse(Path(self.temp.name,'must-not-exist.db').exists())
-        with self.assertRaises(ValueError):validate_admissions({'':self.grants['subject-pip']})
+        with self.assertRaises(ValueError):validate_admissions({'':self.grants['grant-pip']})
         with self.assertRaises(ValueError):validate_admissions([])
 
     def test_missing_client_claim_never_matches_null(self):
         claims=dict(self.claims)
         claims.pop('azp')
-        self.grants['subject-pip']['client_id']=None
+        self.grants['grant-pip']['client_id']=None
         with self.assertRaises(AuthenticationError):
             self.verify(jwt.encode(claims,self.private,algorithm='RS256'))
 

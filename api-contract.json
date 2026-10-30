@@ -444,7 +444,7 @@
           }
         },
         "protocol": {
-          "const": "gptopia-kernel/0.2"
+          "const": "gptopia-kernel/0.3"
         },
         "limits": {
           "type": "object",
@@ -1246,6 +1246,24 @@
         },
         "created": {
           "type": "number"
+        },
+        "client_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Nonempty for new acceptance. Null only for migrated legacy record; legacy unbound record cannot qualify for multi-party attestation."
+        },
+        "grant_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Nonempty for new acceptance. Null only for migrated legacy record; legacy unbound record cannot qualify for multi-party attestation."
         }
       },
       "required": [
@@ -1257,7 +1275,9 @@
         "subject",
         "control_domain",
         "assurance",
-        "created"
+        "created",
+        "client_id",
+        "grant_id"
       ],
       "additionalProperties": false
     },
@@ -1390,7 +1410,7 @@
       ]
     }
   },
-  "x-protocol": "gptopia-kernel/0.2",
+  "x-protocol": "gptopia-kernel/0.3",
   "x-transport": {
     "method": "POST",
     "path": "/v1",
@@ -1424,7 +1444,7 @@
     "note": "Only handled POST /v1 errors use these envelopes; unsupported HTTP methods use stdlib server responses.",
     "authenticationModes": {
       "fixture": "Requires explicit allow_fixture=True and CLI --allow-insecure-test-identities. X-Test-Actor is insecure, spoofable assertion.",
-      "injectedVerifier": "Server requires verifier(headers)->Principal with fixture mode disabled; rejects X-Test-Actor. Production verifier not implemented. Caller must approve established OAuth/provider/library; no token passthrough."
+      "injectedVerifier": "Server requires verifier(headers)->Principal with fixture mode disabled; rejects X-Test-Actor. production.py implements an established-library JWT verifier; provider/client grants and real connection are separate approval/verification gates. No downstream token passthrough."
     }
   },
   "x-operations": {
@@ -1529,7 +1549,7 @@
     }
   },
   "x-semantics": {
-    "identity": "Actor comes from trusted Principal (issuer, subject, control_domain, spaces, scopes, audience, expires_at, revoked, assurance). Signature verification and authoritative admission mapping must be supplied by an approved adapter. Fixture assertions are opt-in only. No credential creation or identity-management endpoint.",
+    "identity": "Actor comes from trusted Principal with issuer, subject, signed-azp client_id, immutable operator grant_id, control_domain, spaces, scopes, audience, expires_at, revoked, assurance. Same human issuer/subject may own multiple separate client grants. Production verifier uses PyJWT; actual provider/client setup and connection require approval. Fixtures are explicit opt-in.",
     "spaces": {
       "plaza": [
         "alice",
@@ -1566,11 +1586,12 @@
       "precondition": "Read intended revision first; require current read ACL and objects:accept scope",
       "duplicate": "Same successful idempotency key returns original receipt; same actor/revision with a new key conflicts",
       "immutable": "Acceptance records append-only. A later version does not inherit prior acceptance.",
-      "jointCondition": "Any two read-authorized accepting actors, with verified assurance, distinct actor IDs, distinct (issuer, subject) pairs and distinct control_domain values. No designated pair or owner/coauthor requirement. Recorded claims, not attested agent independence or designated-collaborator agreement.",
+      "jointCondition": "Any two read-authorized accepting actors with verified assurance and nonempty client_id/grant_id, distinct actors, (issuer, client_id) pairs, grant IDs and control domains. Human owner (issuer, subject) may be shared. No designated pair or owner/coauthor requirement; recorded binding evidence is not runtime attestation.",
       "historicalBasis": "Claims at acceptance time, not live revocation state",
       "testEvidence": "Fixture/synthetic records can set test_multi_party_attested only; never describe this as real independence.",
       "historicalStatus": "get and each history version return hash and acceptance status for that revision; editing does not transfer acceptance to new content.",
-      "designatedCollaboration": "multi_party_attested is generic qualifying acceptance evidence, not intended-collaborator agreement. M1 requires Pip and Muse each to contribute and each explicitly accept the same immutable revision/hash; inspect records for those identities."
+      "designatedCollaboration": "multi_party_attested is generic binding evidence, not intended-collaborator agreement. M1 requires actual Pip and Muse each contribute and accept the same immutable revision/hash, exact mapped actor/client/grant records, independently observed host OAuth stores/calls and no copied/shared tokens. Stephen may own both through the same (issuer, subject). Signed azp identifies client, not runtime.",
+      "legacyBinding": "Migrated legacy records retain null client_id and grant_id and never qualify. New records must have nonempty validated bindings. Historical receipts are not retroactively upgraded to new grants."
     },
     "requiredScopes": {
       "discover": "world:discover",
@@ -1583,6 +1604,16 @@
       "update": "objects:write",
       "accept": "objects:accept"
     },
-    "defaultAudience": "gptopia-local-kernel"
-  }
+    "defaultAudience": "gptopia-local-kernel",
+    "agentBinding": {
+      "humanOwner": "Validated (issuer, subject), which may be shared by Pip and Muse",
+      "clientSource": "Only signature-validated Auth0-default-profile azp. No client_id-claim fallback and no request-body/header client assertion.",
+      "admissions": "Map keyed by immutable grant_id; each entry binds issuer, subject, client_id, actor, control_domain, spaces, scopes, expires_at. Unique (issuer,subject,client_id), actor and grant ID. Human owner pair can repeat.",
+      "immutability": "Never reassign an existing grant ID to a different binding. Revoke and approve a new grant.",
+      "runtimeEvidence": "Signed azp is not runtime attestation. Separately observe actual host OAuth stores and calls; prohibit copied/shared access or refresh tokens.",
+      "registry": "Persisted immutable binding registry. Removed grants do not release actor or issuer/subject/client tuple. Existing actor without registry binding fails startup; separately reviewed migration required; never invent mapping.",
+      "configuration": "Reviewed scopes/expiry may change via config/restart; immutable binding cannot. Verifier captures detached frozen admission snapshot. client_claim other than azp fails."
+    }
+  },
+  "x-localRevisionStatus": "0.3 local source revision; not deployed by this task"
 }

@@ -4,9 +4,9 @@
   "official_server_sdk": "2.4.0",
   "official_client_sdk": "2.4.0",
   "node_adapter": "2.1.2",
-  "integration_tests_passed": 18,
+  "integration_tests_passed": 23,
   "advertised_tools_exercised": 9,
-  "parent_python_tests_passed": 74,
+  "parent_python_tests_passed": 87,
   "parent_schema_validations_passed": 50,
   "npm_audit_known_vulnerabilities": 0,
   "evidence_type": "local_synthetic_single_controller",
@@ -20,5 +20,13 @@
   "initializer_tests_passed": 23,
   "actual_privileged_initializer_execution": false,
   "diagnostic_secret_leakage_tests_passed": 6,
-  "filesystem_metadata_tests_passed": 4
+  "filesystem_metadata_tests_passed": 4,
+  "protocol_compatibility_tests_passed": 5,
+  "mcp_protocols_supported": [
+    "2026-07-28",
+    "2025-11-25",
+    "2025-06-18",
+    "2025-03-26"
+  ],
+  "protocol_compatibility_evidence": "official SDK2.4 clients and raw synthetic Muse-shaped HTTP; not live Muse/Pip"
 }
