@@ -24,7 +24,7 @@ with tempfile.TemporaryDirectory() as tmp:
             boundary.kernel = Boundary(tmp+'/world.db',verifier,grants,now+600).kernel
             return {'status':200}
         if m.get('action')=='test_setup':
-            return dict(a=token(),b=token('test-b'),wrong=token(aud='wrong'),expired=token(exp=now-1),unknown=token('unknown'),read=token(scope='objects:read'),badIssuer=token(iss='https://evil.example'))
+            return dict(status=200,a=token(),b=token('test-b'),wrong=token(aud='wrong'),expired=token(exp=now-1),unknown=token('unknown'),read=token(scope='objects:read'),badIssuer=token(iss='https://evil.example'))
         return original(m)
     boundary.handle=handle
     serve(boundary)

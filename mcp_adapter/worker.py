@@ -75,14 +75,17 @@ def from_env():
 
 def serve(boundary):
     for line in sys.stdin:
+        request_id = None
         try:
             if len(line.encode('utf-8')) > 65536:
                 response = {'status': 413}
             else:
-                response = boundary.handle(json.loads(line))
+                message = json.loads(line)
+                request_id = message.get('id')
+                response = boundary.handle(message)
         except Exception:
             response = {'status': 503}
-        print(json.dumps(response, ensure_ascii=True), flush=True)
+        print(json.dumps(dict(response, id=request_id), ensure_ascii=True), flush=True)
 
 
 if __name__ == '__main__':

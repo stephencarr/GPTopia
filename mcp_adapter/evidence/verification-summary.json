@@ -4,7 +4,7 @@
   "official_server_sdk": "2.4.0",
   "official_client_sdk": "2.4.0",
   "node_adapter": "2.1.2",
-  "integration_tests_passed": 3,
+  "integration_tests_passed": 16,
   "advertised_tools_exercised": 9,
   "parent_python_tests_passed": 51,
   "parent_schema_validations_passed": 50,
@@ -14,5 +14,7 @@
   "deployment": false,
   "plugin_installed": false,
   "external_oauth_provider_configured": false,
-  "container_build": "not_run_no_docker_podman_buildah"
+  "container_build": "not_run_no_docker_podman_buildah",
+  "worker_fault_tests_passed": 13,
+  "worker_fault_evidence": "local synthetic subprocesses; no hosted faults"
 }

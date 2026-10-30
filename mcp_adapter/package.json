@@ -1,1 +1,1 @@
-{"name":"gptopia-private-mcp","private":true,"type":"module","scripts":{"test":"node --test test.mjs"},"dependencies":{"@modelcontextprotocol/node":"2.1.2","@modelcontextprotocol/server":"2.4.0","ajv":"8.20.0"},"devDependencies":{"@modelcontextprotocol/client":"2.4.0"}}
+{"name":"gptopia-private-mcp","private":true,"type":"module","scripts":{"test":"node --test test.mjs test_faults.mjs"},"dependencies":{"@modelcontextprotocol/node":"2.1.2","@modelcontextprotocol/server":"2.4.0","ajv":"8.20.0"},"devDependencies":{"@modelcontextprotocol/client":"2.4.0"}}

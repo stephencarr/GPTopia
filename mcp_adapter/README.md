@@ -146,3 +146,28 @@ vendor fields. `tools.listChanged` is explicitly false (not the SDK default).
 A late worker authentication failure also supplies `mcp/www_authenticate` tool
 metadata; pre-dispatch authentication remains HTTP401 and missing-scope HTTP403.
 This is declaration/response coverage, not proof of the real client's login UI.
+
+## Private worker fault handling (2026-10-30)
+
+The stdio envelope now correlates every response to its pending request ID.
+Malformed, unmatched, truncated or oversized output poisons the whole worker
+channel, as do child failure and request timeout: every pending request resolves
+unavailable, all timers clear, and future requests fail closed. The bounded
+8 MiB output-line accumulator processes each chunk once to avoid quadratic
+rescanning. Queue capacity is eight; excess requests return503 without entering
+the channel. Valid replies are checked for status and action-specific shape.
+
+Shutdown closes the worker before draining HTTP, terminates even a
+SIGTERM-ignoring worker, destroys active connections, and waits for child exit.
+It is idempotent. Health cannot report success when the worker is unavailable.
+Killing a worker does **not** establish that an interrupted mutation rolled back:
+a transaction may already have committed. Retry using the original idempotency
+key and inspect authoritative durable state; never silently replay with a new key.
+
+`test_faults.mjs` adds 13 synthetic subprocess tests to the three existing
+integration tests: exits/stalls, eight pending requests, overflow/recovery,
+malformed JSON/status shapes/IDs, partial/oversized output, failed spawn,
+health/protected HTTP503, and bounded shutdown with an in-flight HTTP request.
+Tests assert empty queues, cleared timers and child termination. The controlled
+fault child is test-only and excluded by the Docker build context. No fault
+injection uses real identities, credentials, external agents or hosted services.
