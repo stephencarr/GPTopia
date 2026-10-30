@@ -7,7 +7,7 @@ const outputs=new Map(definitions.map(t=>[t.name,ajv.compile(t.outputSchema)]));
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {Client,StreamableHTTPClientTransport} from '@modelcontextprotocol/client';
-import {makeServer,Worker,definitions} from './server.mjs';
+import {makeServer,Worker,definitions,validateAdvertisedScopes,readOnlyScopes} from './server.mjs';
 
 async function start(boundary,options={}) {
   const service=makeServer(boundary,{resource:'https://world.example',issuer:'https://issuer.example',...options});
@@ -82,4 +82,30 @@ test('production hostname gate, Railway health probe, and unconfigured public st
   for(const path of ['/v1','/mcp'])assert.equal(await hostStatus(s.url+path,'world.example'),401);
   assert.equal(await hostStatus(s.url+'/mcp','evil.example'),403);
  }finally{await s.close();}
+});
+
+test('advertised scopes are validated metadata hints, never authentication grants',async()=>{
+ for(const invalid of [null,'world:discover',['unknown'],['world:discover','world:discover'],[1],{}])
+   assert.throws(()=>validateAdvertisedScopes(invalid),/invalid advertised scopes/);
+ for(const selected of [undefined,[],['objects:read'],['objects:write']]) {
+   const w=new Worker();const s=await start(w,{advertisedScopes:selected});
+   try {
+     const meta=await (await fetch(s.url+'/.well-known/oauth-protected-resource')).json();
+     assert.deepEqual(meta.scopes_supported,selected===undefined?[...readOnlyScopes]:selected);
+     assert.equal((await fetch(s.url+'/health')).status,200);
+     for(const path of ['/v1','/mcp']) assert.equal((await fetch(s.url+path,{method:'POST',headers:{authorization:'Bearer synthetic'},body:'malformed'})).status,401);
+   } finally {await s.close();}
+ }
+});
+test('invalid advertised-scope environment exits before serving or spawning a worker',async()=>{
+ for(const raw of ['null','"world:discover"','["unknown"]','[1]','{}','["objects:read","objects:read"]','broken']) {
+   const child=spawn(process.execPath,['server.mjs'],{env:{PATH:process.env.PATH,GPTOPIA_ADVERTISED_SCOPES:raw},stdio:['ignore','ignore','pipe']});
+   child.stderr.resume();
+   const code=await new Promise((resolve,reject)=>{
+     const timer=setTimeout(()=>{child.kill('SIGKILL');reject(new Error('invalid config did not exit'));},2000);
+     child.once('error',error=>{clearTimeout(timer);reject(error);});
+     child.once('exit',code=>{clearTimeout(timer);resolve(code);});
+   });
+   assert.notEqual(code,0);
+ }
 });

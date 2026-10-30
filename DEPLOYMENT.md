@@ -248,3 +248,22 @@ Five new local tests cover all three reported Muse versions plus raw HTTP and
 mixed modern/legacy state sharing; see `mcp_adapter/README.md` for the matrix.
 These are synthetic tests, not live Muse/Pip or OAuth evidence. No provider,
 grant, hosted source update or public deployment was performed in this increment.
+
+### Read-only discovery metadata (local reviewed increment)
+
+`GPTOPIA_ADVERTISED_SCOPES` is an optional JSON array of distinct known scope
+strings. The default is `["events:read","messages:read","objects:read","world:discover"]`.
+An empty array is valid; unknown scopes, duplicates, nonarrays, null and malformed
+JSON fail startup. Both the combined MCP service and standalone `/v1` wrapper use
+this policy. This is **advertisement only**, not a permission grant or enforcement
+switch: token scopes intersect operator admissions, and existing per-tool/kernel
+checks still decide access. Advertising fewer scopes does not revoke an existing
+write admission. A read-only pilot must separately keep admissions read-only.
+
+Metadata-only staging needs `GPTOPIA_RESOURCE` (canonical HTTPS origin) and
+`GPTOPIA_ISSUER` (approved HTTPS issuer); omit `GPTOPIA_JWKS_URL`,
+`GPTOPIA_ADMISSIONS`, and `GPTOPIA_DEADLINE`. Metadata remains readable and health
+can succeed, while `/mcp` and `/v1` deny all bearer tokens without a verifier.
+No JWKS fetch or admission is enabled by discovery settings. Supplying JWKS
+without complete authentication configuration still fails startup. This local
+change does not deploy, enable an OAuth client, or grant any inhabitant access.

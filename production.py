@@ -162,8 +162,31 @@ class JWTVerifier:
             raise AuthenticationError('invalid credentials') from None
 
 
-def create_app(db_path, resource=None, issuer=None, verifier=None, admissions=None, deadline=0):
+READ_ONLY_SCOPES = ('events:read', 'messages:read', 'objects:read', 'world:discover')
+
+
+def advertised_scope_list(value=None):
+    """Discovery hint only; never consumed by token verification or admissions."""
+    if value is None:
+        return list(READ_ONLY_SCOPES)
+    if (not isinstance(value, list) or any(not isinstance(s, str) or s not in SCOPES.values() for s in value)
+            or len(value) != len(set(value))):
+        raise ValueError('invalid advertised scopes')
+    return sorted(value)
+
+
+def advertised_scopes_from_env():
+    if 'GPTOPIA_ADVERTISED_SCOPES' not in os.environ:
+        return advertised_scope_list()
+    value = json.loads(os.environ['GPTOPIA_ADVERTISED_SCOPES'])
+    if value is None:
+        raise ValueError('invalid advertised scopes')
+    return advertised_scope_list(value)
+
+
+def create_app(db_path, resource=None, issuer=None, verifier=None, admissions=None, deadline=0, advertised_scopes=None):
     """No verifier/deadline means all application routes deny, health stays live."""
+    advertised_scopes = advertised_scope_list(advertised_scopes)
     admissions = validate_admissions({} if admissions is None else admissions)
     if resource is not None:
         resource_origin(resource)
@@ -194,7 +217,7 @@ def create_app(db_path, resource=None, issuer=None, verifier=None, admissions=No
         if request.url.path == '/healthz' and request.method == 'GET':
             return JSONResponse({'status': 'ok'}, headers={'Cache-Control': 'no-store'})
         if request.url.path == '/.well-known/oauth-protected-resource' and request.method == 'GET' and resource and issuer:
-            return JSONResponse({'resource': resource, 'authorization_servers': [issuer], 'scopes_supported': sorted(set(SCOPES.values()))})
+            return JSONResponse({'resource': resource, 'authorization_servers': [issuer], 'scopes_supported': advertised_scopes})
         # Closed pilots do not perform token verification or outbound JWKS work.
         if deadline and not time.time() < deadline:
             return reply(403, 'pilot_closed')
@@ -254,6 +277,7 @@ def create_app(db_path, resource=None, issuer=None, verifier=None, admissions=No
 
 
 def from_env():
+    advertised_scopes = advertised_scopes_from_env()
     resource, issuer = os.getenv('GPTOPIA_RESOURCE'), os.getenv('GPTOPIA_ISSUER')
     grants = json.loads(os.getenv('GPTOPIA_ADMISSIONS', '{}'))
     deadline = float(os.getenv('GPTOPIA_DEADLINE', '0'))
@@ -262,4 +286,5 @@ def from_env():
         if not resource or not issuer or not grants or not deadline:
             raise ValueError('incomplete authentication configuration')
         verifier = JWTVerifier(issuer, resource, os.environ['GPTOPIA_JWKS_URL'], grants)
-    return create_app(os.getenv('GPTOPIA_DB', '/data/world.sqlite3'), resource, issuer, verifier, grants, deadline)
+    return create_app(os.getenv('GPTOPIA_DB', '/data/world.sqlite3'), resource, issuer, verifier, grants, deadline,
+                      advertised_scopes)
