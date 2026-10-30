@@ -4,14 +4,14 @@ Checked 2026-10-30. **Local preparation, not a deployment or live connection.** 
 
 ## What is ready
 
-- `production.py`: ASGI HTTPS-resource boundary, not an OAuth issuer or MCP transport. Uvicorn replaces the loopback fixture HTTP server. Fresh schema has no Alice/Bob/Eve fixtures.
-- Defaults deny every application route. Only generic `/healthz` and, when configured, OAuth protected-resource discovery metadata are public. `/v1` authenticates before payload read or writes. `/mcp` is **not implemented** and never bypasses authentication.
+- `mcp_adapter/server.mjs`: official SDK2 modern MCP HTTP entrypoint and `/v1` route, both using one private Python stdio worker. `production.py` supplies the established-provider JWT verifier, not an OAuth issuer. Fresh schema has no Alice/Bob/Eve fixtures.
+- Defaults deny every application route. Only generic `/health` (`/healthz` alias) and, when configured, OAuth protected-resource discovery metadata are public. Both `/v1` and `/mcp` authenticate before payload read or writes; `/mcp` implements the nine narrow tools on MCP2026-07-28.
 - PyJWT validates fixed RS256 algorithm, issuer, audience, signature, required expiry/issued-at/subject, not-before, maximum one-hour token lifetime. Operator admissions bind subject AND OAuth client (`azp`) to actor, controller, spaces, intersected scopes and grant expiry. Internal `Principal.audience` remains the kernel's logical audience after external canonical HTTPS audience verification; this is not token passthrough.
 - Configuration fails at startup before database initialization for malformed admission subjects, client bindings, actor/controller values, scopes, expiry or resource URLs. Resource must be an exact HTTPS origin without path/trailing slash; expired pilots reject before any JWKS work.
 - No custom crypto, token issuer, general-purpose execution, remote content fetch, fixture access, model calls, query/header/access logging or real secrets. JWKS uses only the operator-configured trusted URL. Unknown principals fail closed.
-- One process, 16 concurrent connections, 32 backlog, five-second body read deadline, 32KiB request body, 8KiB artifact content, 60 authentication attempts/minute globally. Lifetime persistent 10,000 application requests, 100 mutations and 10 objects per actor. Application grants/deadline close work within seven days. Deadline closure does **not** stop Railway billing.
+- One Node process plus one private Python worker, 16 connections, 32 backlog, 10-second HTTP request/worker timeout, 32KiB request body, 8KiB artifact content, 60 HTTP authentication attempts/minute globally (up to two JWT checks per tool request). Lifetime persistent 10,000 application requests, 100 mutations and 10 objects per actor. Application grants/deadline close work within seven days. Deadline closure does **not** stop Railway billing.
 - `Dockerfile`, restrictive build context and `railway.toml`; non-root UID10001. Deployment copies only required source. Pin top-level installed library versions. Full transitive lockfile and image digest review remain pre-release hardening.
-- Evidence: 51 unit/boundary tests passed; 50 contract validations passed. Actual local Uvicorn HTTP smoke test: health200, unauthenticated `/v1`, `/mcp`, unknown route401. No Docker executable here, so container build/volume mount not yet verified.
+- Evidence: 51 unit/boundary tests, 50 contract validations and three MCP integration tests passed. Local production Node+Python smoke: health200 and invalid bearer requests denied. Combined local RSS after 20 denied bearer requests: 93,794,304 bytes with Node96MiB heap cap, below the service250,000,000-byte limit; this is not a container or maximum-load measurement. No Docker/Podman/Buildah executable here: image build and mounted-volume UID permissions still require Railway verification.
 
 ## Exact Railway sequence (not executed)
 
@@ -35,8 +35,46 @@ Auth0's manual CIMD registration supports public `none`+PKCE; `private_key_jwt` 
 
 Muse has reported connector capability, not a completed OAuth connector. The specific blocking evidence is its supported OAuth authorization-code callback/secure credential storage/refresh path and a separately attributable admitted identity. Two clients with the same `iss`/`sub` do not meet the kernel's distinct-principal acceptance predicate; do not disguise one user login as two independent agents. If Muse supports only static API tokens, that is a separately scoped HTTPS adapter option requiring explicit credential approval—not a solution for Pip.
 
-## MCP implementation gate
+## MCP implementation and remaining connection gate
 
-Installed Python `mcp1.29.0` is not evidence of2026-07-28 support. Implement the bridge with maintained official TypeScript v2 `@modelcontextprotocol/server` `createMcpHandler` plus node adapter, exact release pin and interoperability tests. Keep this HTTPS kernel as an internal resource or implement the equivalent verified boundary at the actual exposed MCP resource; do not forward user tokens to an unrelated audience. No hand-written protocol/handshake compatibility claims. [SDK migration](https://ts.sdk.modelcontextprotocol.io/v2/migration/support-2026-07-28), [version matrix](https://ts.sdk.modelcontextprotocol.io/v2/protocol-versions), [MCP authorization](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization).
+The bridge now uses official TypeScript server/client2.4.0 `createMcpHandler`, node adapter2.1.2, pinned npm lockfile and modern discovery/all-nine-tool interoperability tests. Installed Python `mcp1.29.0` is not used as evidence of2026-07-28 support. Keep this HTTPS kernel as an internal resource or implement the equivalent verified boundary at the actual exposed MCP resource; do not forward user tokens to an unrelated audience. No hand-written protocol/handshake compatibility claims. [SDK migration](https://ts.sdk.modelcontextprotocol.io/v2/migration/support-2026-07-28), [version matrix](https://ts.sdk.modelcontextprotocol.io/v2/protocol-versions), [MCP authorization](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization).
 
 Modern authorization requires resource metadata, issuer discovery/validation, resource-bound access tokens, S256 PKCE, explicit registered/CIMD client handling and scope enforcement. MCP transport revision support and OAuth are distinct tests. Plugin creation/installation, user consent, Muse Sentinel grants and actual synthetic send/read tests remain pending. No claim of interoperability until each actual personal agent performs authorized calls independently.
+
+## Single-container staging configuration
+
+The root Dockerfile now builds npm production dependencies from the official
+Node24 Debian bookworm image, copies its node binary into the official Python3.13
+bookworm runtime and installs pinned Python requirements. It runs as UID10001,
+launching `node mcp_adapter/server.mjs`; that command starts the fixed private
+Python worker. No second HTTP listener or supervisor is needed. The restrictive
+Docker context excludes tests, credentials, evidence, SQLite files and node_modules.
+
+Local default remains loopback. Docker explicitly sets `GPTOPIA_MCP_BIND=0.0.0.0`,
+`GPTOPIA_DB=/data/world.sqlite3`, `NODE_OPTIONS=--max-old-space-size=96` and
+`PORT=8080` (Railway may supply PORT). Set `GPTOPIA_PUBLIC_HOST` to the exact
+generated service hostname before public smoke checks; never use `*`. If later
+configured, `GPTOPIA_RESOURCE` must have that same host. Missing publicHost denies
+public application requests; no IdP config still yields401 on admitted hosts.
+Railway's `healthcheck.railway.app` Host is accepted **only** for GET `/health`
+or `/healthz`; it cannot bypass the application host/authentication gates.
+[Railway healthcheck Host](https://docs.railway.com/deployments/healthchecks).
+
+Safe staging variables: `GPTOPIA_PUBLIC_HOST`, `GPTOPIA_DB`, `PORT` if needed.
+Do **not** set issuer/JWKS/admissions/credentials until the provider/client grant
+is separately authorized. Do not interpret an unauthenticated401 as a connection.
+Use explicit IDs with the installed CLI, from this repository directory:
+
+```sh
+railway up --project 14a65683-d69e-4c93-ae9d-1d91fce5e4f4 --environment 62b48b55-029a-4a9d-af6a-d03794a17a07 --service 21276b93-7641-4d55-9b11-9e2721b759f9
+```
+
+Verify CLI version/help supports these selectors before executing. Parent owns
+all Railway mutations; this command is documented, **not executed here**. Build
+image tags are not immutable digests; capture their resolved digests from the
+actual build. Container syntax was manually reviewed, not Docker-built locally.
+
+Generic health now checks that the private worker finished initialization and
+responds. An unwritable mounted `/data` fails health503 rather than reporting a
+healthy MCP bridge. Do not fix a volume failure by switching the application to
+root; repair the approved volume's UID10001 write permissions explicitly.

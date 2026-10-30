@@ -3,8 +3,8 @@ import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { McpServer, createMcpHandler, fromJsonSchema, requireScopes } from '@modelcontextprotocol/server';
-import { toNodeHandler, localhostHostValidation } from '@modelcontextprotocol/node';
+import { McpServer, createMcpHandler, fromJsonSchema, requireScopes, readRequestBody } from '@modelcontextprotocol/server';
+import { toNodeHandler, hostHeaderValidation } from '@modelcontextprotocol/node';
 
 const contract = JSON.parse(readFileSync(new URL('../adapter-contract.json', import.meta.url)));
 // Inline contract refs so each advertised schema is independently resolvable.
@@ -54,7 +54,9 @@ const descriptions = {
   update:'Update an authorized object using expected_version compare-and-swap; no automatic merge. Requires idempotency.',
   accept:'Explicitly attest to the current exact immutable revision and content_sha256. Read it first; never infer acceptance from messages.'
 };
-export function makeServer(boundary, {resource, issuer}={}) {
+export function makeServer(boundary, {resource, issuer, publicHost}={}) {
+  if (publicHost && (!/^[a-zA-Z0-9.-]+$/.test(publicHost) || publicHost.length>253)) throw new Error('public host must be a hostname only');
+  if (resource && publicHost && new URL(resource).hostname !== publicHost) throw new Error('resource and public host must agree');
   if (resource && new URL(resource).origin !== resource) throw new Error('resource must be canonical HTTPS origin');
   if (resource && !resource.startsWith('https://')) throw new Error('HTTPS resource required');
   if (issuer && !issuer.startsWith('https://')) throw new Error('HTTPS issuer required');
@@ -93,7 +95,10 @@ export function makeServer(boundary, {resource, issuer}={}) {
     if (request.headers.has('origin')) return response(403,'invalid_origin');
     if (url.pathname===metadataPath && request.method==='GET' && resource && issuer)
       return Response.json({resource,authorization_servers:[issuer],scopes_supported:[...new Set(definitions.flatMap(t=>t.requiredScopes))],bearer_methods_supported:['header']},{headers:{'cache-control':'no-store'}});
-    if (url.pathname==='/healthz' && request.method==='GET') return Response.json({status:'ok'});
+    if (['/health','/healthz'].includes(url.pathname) && request.method==='GET') {
+      const health=await boundary.request({action:'health'});
+      return health.status===200?Response.json({status:'ok'}):response(503,'unavailable');
+    }
     if (Date.now()-windowStart>=60000) {windowStart=Date.now();count=0;}
     if (++count>60) return response(429,'rate_limited');
     const auth=request.headers.get('authorization');
@@ -101,21 +106,36 @@ export function makeServer(boundary, {resource, issuer}={}) {
     const identity=await boundary.request({action:'authenticate',token:auth.slice(7)});
     if (identity.status===401) return challenge();
     if (identity.status!==200) return response(identity.status,'boundary_denied');
+    if (url.pathname==='/v1' && request.method==='POST') {
+      if (request.headers.get('content-type')?.split(';')[0]!=='application/json') return response(415,'json_required');
+      const body=await readRequestBody(request,32768);
+      if(body.tooLarge)return response(413,'body_too_large');
+      let payload;try{payload=JSON.parse(body.text);}catch{return response(400,'invalid');}
+      const result=await boundary.request({action:'call',token:auth.slice(7),payload});
+      if(result.status!==200)return response(result.status,'boundary_denied');
+      const status=result.result.ok?200:({unauthenticated:401,forbidden:403,not_found:404,conflict:409,quota:429}[result.result.error.code]??400);
+      return Response.json(result.result,{status,headers:{'cache-control':'no-store'}});
+    }
     if (url.pathname!=='/mcp') return response(404,'not_found');
     const result=await mcp.fetch(request,{authInfo:{token:auth.slice(7),scopes:identity.scopes}});
     result.headers.set('cache-control','no-store');
     return result;
   }});
-  const validateHost=localhostHostValidation();
+  const validateHost=hostHeaderValidation(['localhost','127.0.0.1','[::1]',...(publicHost?[publicHost]:[])]);
   const http=createServer(async(req,res)=>{
-    if(!validateHost(req,res))return;
+    // Railway health probes have a fixed Host; never grant it application access.
+    const healthProbe=req.method==='GET' && ['/health','/healthz'].includes(req.url) && req.headers.host==='healthcheck.railway.app';
+    if(!healthProbe && !validateHost(req,res))return;
     try {await handler(req,res);} catch {if(!res.headersSent){res.writeHead(503,{'content-type':'application/json'});res.end('{"error":"unavailable"}');}else res.destroy();}
   });
   http.requestTimeout=10000;http.headersTimeout=10000;
   return {http,close:async()=>{await mcp.close();await new Promise(resolve=>http.close(resolve));boundary.close?.();}};
 }
 if (process.argv[1]===fileURLToPath(import.meta.url)) {
-  const service=makeServer(new Worker(),{resource:process.env.GPTOPIA_RESOURCE,issuer:process.env.GPTOPIA_ISSUER});
-  service.http.listen(Number(process.env.GPTOPIA_MCP_PORT ?? 8766),'127.0.0.1');
+  const service=makeServer(new Worker(),{resource:process.env.GPTOPIA_RESOURCE,issuer:process.env.GPTOPIA_ISSUER,publicHost:process.env.GPTOPIA_PUBLIC_HOST});
+  const bind=process.env.GPTOPIA_MCP_BIND ?? '127.0.0.1';
+  if (!['127.0.0.1','0.0.0.0'].includes(bind)) throw new Error('unsupported bind address');
+  service.http.maxConnections=16;
+  service.http.listen({port:Number(process.env.PORT ?? process.env.GPTOPIA_MCP_PORT ?? 8766),host:bind,backlog:32});
   for (const signal of ['SIGINT','SIGTERM']) process.on(signal,()=>service.close().then(()=>process.exit(0)));
 }

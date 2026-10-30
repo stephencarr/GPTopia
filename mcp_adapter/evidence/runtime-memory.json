@@ -1,0 +1,19 @@
+{
+  "mode": "local production entrypoint, no IdP, 20 denied bearer requests",
+  "heap_cap_mib": 96,
+  "processes": [
+    {
+      "pid": 6,
+      "rss_kib": 64596,
+      "command": "MainThread"
+    },
+    {
+      "pid": 14,
+      "rss_kib": 27000,
+      "command": "python"
+    }
+  ],
+  "combined_rss_bytes": 93794304,
+  "service_limit_bytes": 250000000,
+  "container_measured": false
+}

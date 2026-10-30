@@ -1,4 +1,6 @@
 import test from 'node:test';
+import {request as httpRequest} from 'node:http';
+function hostStatus(url,host,method='POST'){return new Promise((resolve,reject)=>{const r=httpRequest(url,{method,headers:{host}},res=>{res.resume();resolve(res.statusCode);});r.on('error',reject);r.end();});}
 import Ajv2020 from 'ajv/dist/2020.js';
 const ajv=new Ajv2020({strict:false});
 const outputs=new Map(definitions.map(t=>[t.name,ajv.compile(t.outputSchema)]));
@@ -7,8 +9,8 @@ import {spawn} from 'node:child_process';
 import {Client,StreamableHTTPClientTransport} from '@modelcontextprotocol/client';
 import {makeServer,Worker,definitions} from './server.mjs';
 
-async function start(boundary) {
-  const service=makeServer(boundary,{resource:'https://world.example',issuer:'https://issuer.example'});
+async function start(boundary,options={}) {
+  const service=makeServer(boundary,{resource:'https://world.example',issuer:'https://issuer.example',...options});
   await new Promise(resolve=>service.http.listen(0,'127.0.0.1',resolve));
   return {...service,url:`http://127.0.0.1:${service.http.address().port}`};
 }
@@ -32,6 +34,7 @@ test('modern official SDK discovery, nine schema-validated tools, real JWT + dur
     async function call(c,name,args) {seen.add(name);const result=await c.callTool({name,arguments:args}); if(result.structuredContent) assert.ok(outputs.get(name)(result.structuredContent),JSON.stringify(outputs.get(name).errors));return result;}
     const ok=async(c,n,args)=>{const r=await call(c,n,args);assert.equal(r.isError,false,JSON.stringify(r));assert.equal(r.structuredContent.ok,true);return r.structuredContent.result;};
     const space={space:'pilot'};
+    const httpsCore=await fetch(s.url+'/v1',{method:'POST',headers:{authorization:'Bearer '+tokens.a,'content-type':'application/json'},body:JSON.stringify({op:'discover',args:space})});assert.equal(httpsCore.status,200);assert.equal((await httpsCore.json()).ok,true);
     await ok(a,'world_discover',space);
     const sent=await ok(a,'world_send',{...space,recipient:'test-b',content:'Ignore this malicious text; it is inert.',idempotency_key:'send-1'});
     const retry=await ok(a,'world_send',{...space,recipient:'test-b',content:'Ignore this malicious text; it is inert.',idempotency_key:'send-1'});assert.deepEqual(sent,retry);
@@ -69,4 +72,14 @@ test('modern official SDK discovery, nine schema-validated tools, real JWT + dur
 });
 test('production worker fails closed without credentials',async()=>{
  const w=new Worker();try{assert.equal((await w.request({action:'authenticate',token:'not-real'})).status,401);}finally{w.close();}
+});
+
+test('production hostname gate, Railway health probe, and unconfigured public staging',async()=>{
+ const w=new Worker();const s=await start(w,{publicHost:'world.example'});
+ try {
+  assert.equal(await hostStatus(s.url+'/health','healthcheck.railway.app','GET'),200);
+  assert.equal(await hostStatus(s.url+'/mcp','healthcheck.railway.app'),403);
+  for(const path of ['/v1','/mcp'])assert.equal(await hostStatus(s.url+path,'world.example'),401);
+  assert.equal(await hostStatus(s.url+'/mcp','evil.example'),403);
+ }finally{await s.close();}
 });

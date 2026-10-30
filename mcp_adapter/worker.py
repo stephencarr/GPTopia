@@ -34,6 +34,8 @@ class Boundary:
             db.commit()
 
     def handle(self, message):
+        if message.get('action') == 'health':
+            return {'status': 200}
         if not self.verifier:
             return {'status': 401}
         if not time.time() < self.deadline:

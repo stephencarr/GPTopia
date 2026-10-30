@@ -35,14 +35,16 @@ npm test
 node server.mjs
 ```
 
-The server binds **only `127.0.0.1:8766`**, even when configured. Override only
-the port with `GPTOPIA_MCP_PORT`. `/healthz` is public; `/mcp` requires valid
+The local default binds **`127.0.0.1:8766`**. `GPTOPIA_MCP_BIND=0.0.0.0` is an
+explicit deployment opt-in in the root Dockerfile; `GPTOPIA_PUBLIC_HOST` must name
+the admitted service hostname. `PORT` or `GPTOPIA_MCP_PORT` selects the port.
+`/health` and `/healthz` are public; `/mcp` requires valid
 credentials for every request including discovery/tool listing. With no
 configuration, application access returns 401. The default SQLite location is
 `/tmp/gptopia-mcp/world.sqlite3`; use an explicitly chosen durable `GPTOPIA_DB`
 for approved future hosting. Do not treat temporary storage as durable hosting.
 
-No deployment settings or parent Dockerfile are changed. These commands do not
+The root Dockerfile now prepares one non-root Node+Python container. These commands do not
 install a ChatGPT plugin or activate an identity provider.
 
 ## Provider configuration — NOT yet set up
@@ -69,9 +71,10 @@ budget, 100 successful mutations and 10 objects; pilot and admission deadlines
 at most seven days. All Origin headers are denied (403); loopback Host guard
 rejects rebinding. Only fixed provider JWKS access is permitted by the verifier.
 
-A future approved hosting step needs an explicit reverse-proxy/TLS design and
-host policy review. This loopback entry is intentionally **not** a Railway
-public-service entrypoint. Do not widen its bind address as an incidental fix.
+The explicitly configured container entry supports Railway staging through its
+TLS proxy; see `../DEPLOYMENT.md`. Unknown hosts are denied. The fixed Railway
+healthcheck Host is admitted only for the two generic health paths. The same
+verified worker also backs `/v1`, without a second listening port.
 
 ## Protocol and schema details
 
@@ -98,7 +101,7 @@ replace client confirmation policies or server-side authority.
 
 ## Evidence and limits
 
-`npm test` runs two integration tests with many assertions:
+`npm test` runs three integration tests with many assertions:
 - Official SDK modern discovery/list/call over loopback, all nine tools.
 - Every successful tool output validated by official client; all structured
   envelopes additionally validated against advertised JSON Schema (AJV2020).
