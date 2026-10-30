@@ -104,6 +104,50 @@ class PrivilegedSyscallTests(unittest.TestCase):
             entry.main()
             self.assertEqual(events,['prepare','drop',('exec',('/usr/local/bin/node',['node','mcp_adapter/server.mjs']))])
 
+class FilesystemMetadataTests(unittest.TestCase):
+    def test_valid_root_only_directory_is_inspected_not_modified(self):
+        info=SimpleNamespace(st_mode=stat.S_IFDIR|0o700,st_uid=0,st_gid=0)
+        with patch.object(entry.os,'open',return_value=43) as opened,patch.object(entry.os,'fstat',return_value=info), \
+             patch.object(entry.os,'close') as close,patch.object(entry.os,'listdir') as listed, \
+             patch.object(entry.os,'fchown') as chown,patch.object(entry.os,'fchmod') as chmod:
+            entry.validate_filesystem_metadata(42)
+            opened.assert_called_once_with('lost+found',os.O_PATH|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=42)
+            close.assert_called_once_with(43);listed.assert_not_called();chown.assert_not_called();chmod.assert_not_called()
+    def test_wrong_owner_group_mode_or_type_refused(self):
+        cases=[(stat.S_IFDIR|0o700,10001,0),(stat.S_IFDIR|0o700,0,10001),
+               (stat.S_IFDIR|0o755,0,0),(stat.S_IFDIR|0o770,0,0),
+               (stat.S_IFDIR|0o4700,0,0),(stat.S_IFREG|0o700,0,0)]
+        for mode,uid,gid in cases:
+            with self.subTest(mode=mode,uid=uid,gid=gid),patch.object(entry.os,'open',return_value=43), \
+                 patch.object(entry.os,'fstat',return_value=SimpleNamespace(st_mode=mode,st_uid=uid,st_gid=gid)),patch.object(entry.os,'close'):
+                with self.assertRaises(entry.StartupRefusal) as error:entry.validate_filesystem_metadata(42)
+                self.assertEqual(error.exception.reason,'filesystem_metadata_unsafe')
+    def test_real_symlink_and_file_refused_without_following(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            parent=os.open(tmp,os.O_RDONLY|os.O_DIRECTORY)
+            try:
+                metadata=Path(tmp)/'lost+found';metadata.symlink_to('/')
+                with self.assertRaises(entry.StartupRefusal) as error:entry.validate_filesystem_metadata(parent)
+                self.assertEqual(error.exception.reason,'filesystem_metadata_unsafe')
+                metadata.unlink();metadata.write_text('unchanged')
+                with self.assertRaises(entry.StartupRefusal):entry.validate_filesystem_metadata(parent)
+                self.assertEqual(metadata.read_text(),'unchanged')
+            finally:os.close(parent)
+    def test_only_exact_metadata_name_is_special_cased(self):
+        initial=SimpleNamespace(st_mode=stat.S_IFDIR|0o755,st_uid=0,st_gid=0)
+        final=SimpleNamespace(st_mode=stat.S_IFDIR|0o700,st_uid=10001,st_gid=10001)
+        for names in [['lost+found'],['LOST+FOUND'],['lost+found','other']]:
+            with self.subTest(names=names),patch.dict(os.environ,{'GPTOPIA_DB':entry.DATABASE}), \
+                 patch.object(entry.os,'geteuid',return_value=0),patch.object(entry.os,'open',return_value=42), \
+                 patch.object(entry.os,'fstat',side_effect=[initial,final]),patch.object(entry.os,'listdir',return_value=names), \
+                 patch.object(entry.os,'fchown') as chown,patch.object(entry.os,'fchmod'),patch.object(entry.os,'close'), \
+                 patch.object(entry,'validate_filesystem_metadata') as metadata:
+                if names==['lost+found']:
+                    entry.prepare_data();metadata.assert_called_once_with(42);chown.assert_called_once_with(42,10001,10001)
+                else:
+                    with self.assertRaises(entry.StartupRefusal) as error:entry.prepare_data()
+                    self.assertEqual(error.exception.reason,'unexpected_entry');chown.assert_not_called()
+
 class DiagnosticTests(unittest.TestCase):
     def test_each_reason_is_bounded_and_never_logs_exception_details(self):
         for reason in entry.REASONS:

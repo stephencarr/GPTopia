@@ -94,9 +94,9 @@ following symlinks, validates existing entries before mutation, and changes only
 the directory's ownership/mode to10001:10001/0700. Existing SQLite DB/WAL/SHM must
 already be regular, single-link, non-group/world-writable files owned10001:10001.
 Symlinks, hardlinks, foreign/root-owned files, and unknown entries are refused;
-no recursive chown or automatic data-file repair occurs. Unknown volume entries
-(including lost+found) need separately reviewed handling rather than silently
-expanding startup authority. Application umask is077. Failed checks/drop prevent
+no recursive chown or automatic data-file repair occurs. Unknown volume entries need separately reviewed handling. The sole metadata
+exception is the exact `lost+found` name under the checks below; no other name
+is exempted. Application umask is077. Failed checks/drop prevent
 exec and emit only a generic refusal, without environment/credential logging.
 
 Local verification:13 initializer tests combine real unprivileged filesystem
@@ -139,3 +139,20 @@ runtime facts; the previous generic refusal cannot distinguish them. The new
 codes preserve all prior fail-closed checks. No root-network fallback or
 permission broadening is introduced. Actual diagnostic deployment remains a
 parent/reviewer decision, not part of local implementation.
+
+### Narrow filesystem metadata exception
+
+A fresh hosted volume produced `reason=unexpected_entry`; this does not identify
+its contents. The initializer now recognizes only the fixed `lost+found` entry
+when its inode is a real directory owned0:0 with exactly0700 permissions. It uses
+Linux `O_PATH|O_DIRECTORY|O_NOFOLLOW`, then fstat: no symlink following, traversal,
+content reads, recursive walk, chmod, chown or deletion of that entry. O_PATH
+also permits metadata inspection on later nonroot starts without opening the
+root-only directory for reading. All other unknown names still produce
+`unexpected_entry`; malformed known metadata produces `filesystem_metadata_unsafe`.
+
+This support does **not** assert that the current hosted entry is lost+found or
+that the next deployment will succeed. Actual mount/drop/readiness remain runtime
+gates. Tests cover the exact allowed inode metadata, wrong type/owner/group/mode,
+real symlink/file refusal, non-mutation and other-name rejection. Root ownership
+is simulated in the valid-directory test; no local privileged execution claimed.

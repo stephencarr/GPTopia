@@ -6,7 +6,7 @@
   "node_adapter": "2.1.2",
   "integration_tests_passed": 18,
   "advertised_tools_exercised": 9,
-  "parent_python_tests_passed": 70,
+  "parent_python_tests_passed": 74,
   "parent_schema_validations_passed": 50,
   "npm_audit_known_vulnerabilities": 0,
   "evidence_type": "local_synthetic_single_controller",
@@ -17,7 +17,8 @@
   "container_build": "not_run_no_docker_podman_buildah",
   "worker_fault_tests_passed": 15,
   "worker_fault_evidence": "local synthetic subprocesses; no hosted faults",
-  "initializer_tests_passed": 19,
+  "initializer_tests_passed": 23,
   "actual_privileged_initializer_execution": false,
-  "diagnostic_secret_leakage_tests_passed": 6
+  "diagnostic_secret_leakage_tests_passed": 6,
+  "filesystem_metadata_tests_passed": 4
 }
