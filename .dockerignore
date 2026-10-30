@@ -1,0 +1,6 @@
+*
+!Dockerfile
+!requirements-production.txt
+!identity.py
+!kernel.py
+!production.py
