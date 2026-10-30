@@ -20,7 +20,7 @@ REASONS = frozenset({
     'entry_stat', 'entry_owner_type_mode', 'entry_close', 'directory_chown',
     'directory_requires_init', 'directory_chmod', 'directory_verify',
     'directory_close', 'drop_groups', 'drop_gid', 'drop_uid', 'identity_verify',
-    'runtime_prepare', 'application_exec', 'internal_error',
+    'runtime_prepare', 'application_exec', 'internal_error', 'filesystem_metadata_unsafe',
 })
 
 
@@ -37,6 +37,21 @@ def checked(reason, operation, *args, **kwargs):
         raise StartupRefusal(reason) from None
 
 
+def validate_filesystem_metadata(parent_fd):
+    # Fixed ext4 metadata name only. O_PATH inspects the inode even during a
+    # nonroot restart without reading/traversing its root-only contents.
+    # Never chown, chmod, enumerate or delete filesystem recovery metadata.
+    item = checked('filesystem_metadata_unsafe', os.open, 'lost+found',
+                   os.O_PATH | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent_fd)
+    try:
+        info = checked('filesystem_metadata_unsafe', os.fstat, item)
+        if (not stat.S_ISDIR(info.st_mode) or (info.st_uid, info.st_gid) != (0, 0)
+                or stat.S_IMODE(info.st_mode) != 0o700):
+            raise StartupRefusal('filesystem_metadata_unsafe')
+    finally:
+        checked('filesystem_metadata_unsafe', os.close, item)
+
+
 def prepare_data():
     if os.environ.get('GPTOPIA_DB', DATABASE) != DATABASE:
         raise StartupRefusal('database_config')
@@ -51,6 +66,9 @@ def prepare_data():
         # Refuse migration/repair of foreign-owned databases; that needs a
         # separately reviewed maintenance action, not a broad startup chown.
         for entry in checked('directory_list', os.listdir, fd):
+            if entry == 'lost+found':
+                validate_filesystem_metadata(fd)
+                continue
             if entry not in FILES:
                 raise StartupRefusal('unexpected_entry')
             item = checked('entry_open', os.open, entry, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=fd)

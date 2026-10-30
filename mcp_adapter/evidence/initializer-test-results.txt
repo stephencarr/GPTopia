@@ -3,6 +3,6 @@
 GPTopia startup refused reason=internal_error
 GPTopia startup identity_verified uid=10001 gid=10001 saved_ids_verified=true startup_boundary_ready=true application_ready=false
 ----------------------------------------------------------------------
-Ran 70 tests in 5.021s
+Ran 74 tests in 5.375s
 
 OK
