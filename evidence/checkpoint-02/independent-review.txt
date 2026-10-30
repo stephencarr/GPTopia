@@ -1,0 +1,12 @@
+Independent read-only review, 2026-10-30 UTC
+
+PASS: 41 tests, original demo, acceptance demo; 5 malformed revoked values rejected.
+Actual successful outputs for all 9 operations validate against final adapter schema.
+History and discovery schema parity corrected. Neutral multi_party_attested naming
+and explicit Pip/Muse M1 distinction verified. No remaining blocking logical-boundary
+finding in this local prototype review.
+
+Reviewed kernel.py SHA256:
+99fd26d983e43c7446e4febb63dbcef273d343fb4e4d217eee6f36a843f7fc08
+
+This is not a production security audit or proof of real identity verification.

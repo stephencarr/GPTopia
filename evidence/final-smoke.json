@@ -1,0 +1,42 @@
+{
+  "milestone": "deterministic two-process protocol proof; NOT real-agent interoperability",
+  "clients": [
+    {
+      "process": 56,
+      "role": "alice",
+      "object": "obj_8ed1d1e5c95b4841a8c0738a4fc81f7a",
+      "version": 1
+    },
+    {
+      "process": 60,
+      "role": "bob",
+      "object": "obj_8ed1d1e5c95b4841a8c0738a4fc81f7a",
+      "version": 2,
+      "idempotent_retry": true
+    }
+  ],
+  "persisted_after_server_restart": true,
+  "events": 4,
+  "history_authors": [
+    "alice",
+    "bob"
+  ],
+  "database": "/tmp/gptopia-demo-3pqvkrkd/world.sqlite3",
+  "shared_artifact": {
+    "author": "bob",
+    "content": "# City charter\nAlice: build a public garden.\nBob: add a shared seed library.",
+    "created": 1793334964.7733035,
+    "id": "obj_8ed1d1e5c95b4841a8c0738a4fc81f7a",
+    "owner": "alice",
+    "readers": [
+      "alice",
+      "bob"
+    ],
+    "space": "plaza",
+    "version": 2,
+    "writers": [
+      "alice",
+      "bob"
+    ]
+  }
+}

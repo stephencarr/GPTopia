@@ -1,0 +1,39 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> test
+> node --test test.mjs test_faults.mjs
+
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ modern official SDK discovery, nine schema-validated tools, real JWT + durable kernel (789.607776ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ production worker fails closed without credentials (191.352367ms)
+✔ production hostname gate, Railway health probe, and unconfigured public staging (249.591636ms)
+✔ worker exit: all pending calls fail closed and timers clear (110.825849ms)
+✔ worker stall: all pending calls fail closed and timers clear (1522.349732ms)
+✔ worker malformed: all pending calls fail closed and timers clear (107.049296ms)
+✔ worker wrong-id: all pending calls fail closed and timers clear (96.926524ms)
+✔ worker partial: all pending calls fail closed and timers clear (81.816596ms)
+✔ worker oversize: all pending calls fail closed and timers clear (194.894177ms)
+✔ malformed successful authentication response is not trusted (680.682838ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ eight-request queue rejects excess without response misrouting (304.515614ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ HTTP health and protected requests never succeed after worker exit (122.080139ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ HTTP health and protected requests never succeed after worker stall (1536.914281ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ HTTP health and protected requests never succeed after worker malformed (301.657738ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ shutdown immediately settles requests and reaps SIGTERM-ignoring child (23.538765ms)
+✔ spawn failure settles pending work without waiting for an exit event (11.311799ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ contradictory unavailable/success envelope denied by worker layer (576.700193ms)
+✔ contradictory unavailable/success envelope denied by handler layer (20.759376ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6252.215129

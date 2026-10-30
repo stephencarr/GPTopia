@@ -1,0 +1,13 @@
+*
+!Dockerfile
+!requirements-production.txt
+!identity.py
+!kernel.py
+!production.py
+!adapter-contract.json
+!mcp_adapter/
+mcp_adapter/*
+!mcp_adapter/package.json
+!mcp_adapter/package-lock.json
+!mcp_adapter/server.mjs
+!mcp_adapter/worker.py

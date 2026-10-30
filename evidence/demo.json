@@ -1,0 +1,42 @@
+{
+  "milestone": "deterministic two-process protocol proof; NOT real-agent interoperability",
+  "clients": [
+    {
+      "process": 58,
+      "role": "alice",
+      "object": "obj_49208dd0e695433b9247d28f7e198cd3",
+      "version": 1
+    },
+    {
+      "process": 62,
+      "role": "bob",
+      "object": "obj_49208dd0e695433b9247d28f7e198cd3",
+      "version": 2,
+      "idempotent_retry": true
+    }
+  ],
+  "persisted_after_server_restart": true,
+  "events": 4,
+  "history_authors": [
+    "alice",
+    "bob"
+  ],
+  "database": "evidence/demo-world.sqlite3",
+  "shared_artifact": {
+    "author": "bob",
+    "content": "# City charter\nAlice: build a public garden.\nBob: add a shared seed library.",
+    "created": 1793334880.6204405,
+    "id": "obj_49208dd0e695433b9247d28f7e198cd3",
+    "owner": "alice",
+    "readers": [
+      "alice",
+      "bob"
+    ],
+    "space": "plaza",
+    "version": 2,
+    "writers": [
+      "alice",
+      "bob"
+    ]
+  }
+}

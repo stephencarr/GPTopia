@@ -1,0 +1,47 @@
+test_acceptance_authorization_and_quota (test_identity_acceptance.AcceptanceTests.test_acceptance_authorization_and_quota) ... ok
+test_acceptance_deduplication_and_new_key_conflict (test_identity_acceptance.AcceptanceTests.test_acceptance_deduplication_and_new_key_conflict) ... ok
+test_acceptance_is_immutable_and_edit_does_not_carry_it_forward (test_identity_acceptance.AcceptanceTests.test_acceptance_is_immutable_and_edit_does_not_carry_it_forward) ... ok
+test_concurrent_accept_and_edit_cannot_accept_wrong_revision (test_identity_acceptance.AcceptanceTests.test_concurrent_accept_and_edit_cannot_accept_wrong_revision) ... ok
+test_default_raw_string_and_fixture_principal_are_denied (test_identity_acceptance.AcceptanceTests.test_default_raw_string_and_fixture_principal_are_denied) ... ok
+test_hash_and_acceptance_bind_exact_current_revision (test_identity_acceptance.AcceptanceTests.test_hash_and_acceptance_bind_exact_current_revision) ... ok
+test_invalid_expired_revoked_audience_and_scopes (test_identity_acceptance.AcceptanceTests.test_invalid_expired_revoked_audience_and_scopes) ... ok
+test_json_sender_spoof_cannot_override_trusted_principal (test_identity_acceptance.AcceptanceTests.test_json_sender_spoof_cannot_override_trusted_principal) ... ok
+test_migration_from_pre_acceptance_schema (test_identity_acceptance.AcceptanceTests.test_migration_from_pre_acceptance_schema) ... ok
+test_operation_scope_is_not_interchangeable (test_identity_acceptance.AcceptanceTests.test_operation_scope_is_not_interchangeable) ... ok
+test_synthetic_pair_is_only_test_multi_party_attested (test_identity_acceptance.AcceptanceTests.test_synthetic_pair_is_only_test_multi_party_attested) ... ok
+test_unit_only_verified_marker_requires_distinct_attribution_and_control (test_identity_acceptance.AcceptanceTests.test_unit_only_verified_marker_requires_distinct_attribution_and_control) ... ok
+test_missing_invalid_expired_revoked_audience_scope_and_spoof (test_identity_acceptance.SyntheticVerifierHTTPTests.test_missing_invalid_expired_revoked_audience_scope_and_spoof) ... ok
+test_server_requires_verifier_and_disallows_mixed_fixture_mode (test_identity_acceptance.SyntheticVerifierHTTPTests.test_server_requires_verifier_and_disallows_mixed_fixture_mode) ... ok
+test_http_duplicate_concurrent_retry_has_one_effect (test_kernel.HTTPTests.test_http_duplicate_concurrent_retry_has_one_effect) ... ok
+test_http_rejects_invalid_framing_hosts_and_json (test_kernel.HTTPTests.test_http_rejects_invalid_framing_hosts_and_json) ... ok
+test_http_statuses_and_browser_origin_rejection (test_kernel.HTTPTests.test_http_statuses_and_browser_origin_rejection) ... ok
+test_server_process_restart_persists_state (test_kernel.HTTPTests.test_server_process_restart_persists_state) ... ok
+test_two_client_processes_concurrent_version_conflict (test_kernel.HTTPTests.test_two_client_processes_concurrent_version_conflict)
+Two deterministic OS clients test concurrency, not independent agents. ... ok
+test_cli_fixture_gate_and_readonly_inspection (test_kernel.KernelTests.test_cli_fixture_gate_and_readonly_inspection) ... ok
+test_content_bounds_are_utf8_bytes (test_kernel.KernelTests.test_content_bounds_are_utf8_bytes) ... ok
+test_content_is_inert_untrusted_text (test_kernel.KernelTests.test_content_is_inert_untrusted_text) ... ok
+test_cross_space_objects_and_acl_are_rejected (test_kernel.KernelTests.test_cross_space_objects_and_acl_are_rejected) ... ok
+test_denied_requests_are_audited_without_content (test_kernel.KernelTests.test_denied_requests_are_audited_without_content) ... ok
+test_discovery_is_space_scoped (test_kernel.KernelTests.test_discovery_is_space_scoped) ... ok
+test_event_pagination_resume_no_duplicates (test_kernel.KernelTests.test_event_pagination_resume_no_duplicates) ... ok
+test_events_and_audit_append_only_triggers (test_kernel.KernelTests.test_events_and_audit_append_only_triggers) ... ok
+test_expected_version_prevents_lost_update (test_kernel.KernelTests.test_expected_version_prevents_lost_update) ... ok
+test_inbox_delivery_privacy_and_retry (test_kernel.KernelTests.test_inbox_delivery_privacy_and_retry) ... ok
+test_input_validation (test_kernel.KernelTests.test_input_validation) ... ok
+test_lifetime_mutation_quota_and_retry_after_exhaustion (test_kernel.KernelTests.test_lifetime_mutation_quota_and_retry_after_exhaustion) ... ok
+test_new_reader_cannot_read_pre_grant_history (test_kernel.KernelTests.test_new_reader_cannot_read_pre_grant_history) ... ok
+test_object_quota_is_per_owner_and_rejected_transaction_atomic (test_kernel.KernelTests.test_object_quota_is_per_owner_and_rejected_transaction_atomic) ... ok
+test_owner_cannot_be_removed_and_writers_are_readers (test_kernel.KernelTests.test_owner_cannot_be_removed_and_writers_are_readers) ... ok
+test_owner_only_acl_and_attribution (test_kernel.KernelTests.test_owner_only_acl_and_attribution) ... ok
+test_persistence_across_new_kernel_instance (test_kernel.KernelTests.test_persistence_across_new_kernel_instance) ... ok
+test_read_permission_does_not_imply_write (test_kernel.KernelTests.test_read_permission_does_not_imply_write) ... ok
+test_retry_is_atomic_and_payload_bound (test_kernel.KernelTests.test_retry_is_atomic_and_payload_bound) ... ok
+test_retry_keys_are_identity_scoped (test_kernel.KernelTests.test_retry_keys_are_identity_scoped) ... ok
+test_revocation_filters_current_history_and_events (test_kernel.KernelTests.test_revocation_filters_current_history_and_events) ... ok
+test_unauthorized_read_write_and_history (test_kernel.KernelTests.test_unauthorized_read_write_and_history) ... ok
+
+----------------------------------------------------------------------
+Ran 41 tests in 3.895s
+
+OK
