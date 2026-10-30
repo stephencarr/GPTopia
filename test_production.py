@@ -101,4 +101,29 @@ class ProductionTests(unittest.TestCase):
             self.assertEqual(response.json()['error']['code'],'pilot_closed')
             self.assertEqual(c.get('/healthz').status_code,200)
 
+    def test_advertised_scopes_metadata_only(self):
+        from production import READ_ONLY_SCOPES, from_env
+        from unittest.mock import patch
+        import json
+        for selected in [None, [], ['objects:read'], ['objects:write']]:
+            env = {'GPTOPIA_DB':self.db, 'GPTOPIA_RESOURCE':'https://world.example', 'GPTOPIA_ISSUER':'https://issuer.example/'}
+            if selected is not None:
+                env['GPTOPIA_ADVERTISED_SCOPES'] = json.dumps(selected)
+            with patch.dict('os.environ', env, clear=True), patch('production.JWTVerifier', side_effect=AssertionError('must not construct verifier')):
+                with TestClient(from_env(), base_url='https://world.example') as c:
+                    self.assertEqual(c.get('/.well-known/oauth-protected-resource').json()['scopes_supported'], list(READ_ONLY_SCOPES) if selected is None else selected)
+                    for path in ['/v1','/mcp']:
+                        self.assertEqual(c.post(path, headers={'Authorization':'Bearer synthetic'}, content='malformed').status_code, 401)
+
+    def test_advertised_scope_invalid_config_fails_before_db(self):
+        from production import advertised_scopes_from_env
+        from unittest.mock import patch
+        for raw in ['null','"world:discover"','["unknown"]','[1]','{}','["objects:read","objects:read"]','broken']:
+            with self.subTest(raw=raw), patch.dict('os.environ', {'GPTOPIA_ADVERTISED_SCOPES':raw}), self.assertRaises(ValueError):
+                advertised_scopes_from_env()
+        path=str(Path(self.temp.name)/'not-created.db')
+        with self.assertRaises(ValueError):
+            create_app(path, advertised_scopes=['unknown'])
+        self.assertFalse(Path(path).exists())
+
 if __name__=='__main__':unittest.main()
