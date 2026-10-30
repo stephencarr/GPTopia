@@ -1,7 +1,8 @@
 /workspace/scratch/8fae6ee445fc/gptopia/test_production.py:9: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
   from starlette.testclient import TestClient
-GPTopia startup refused: data or privilege boundary invalid
+GPTopia startup refused reason=internal_error
+GPTopia startup identity_verified uid=10001 gid=10001 saved_ids_verified=true startup_boundary_ready=true application_ready=false
 ----------------------------------------------------------------------
-Ran 64 tests in 6.858s
+Ran 70 tests in 5.021s
 
 OK

@@ -1,5 +1,7 @@
 """Synthetic syscall tests + real filesystem checks; NOT root execution evidence."""
 import os
+import io
+from contextlib import redirect_stderr
 import stat
 import tempfile
 import unittest
@@ -29,11 +31,11 @@ class FilesystemTests(unittest.TestCase):
         self.assertEqual(stat.S_IMODE(self.data.stat().st_mode),0o700)
     def test_data_symlink_refused(self):
         self.data.rmdir();self.data.symlink_to(self.temp.name)
-        with self.assertRaises(OSError): entry.prepare_data()
+        with self.assertRaises(entry.StartupRefusal): entry.prepare_data()
     def test_database_symlink_refused_without_mutation(self):
         outside=Path(self.temp.name)/'outside';outside.write_text('unchanged')
         (self.data/'world.sqlite3').symlink_to(outside)
-        with self.assertRaises(OSError):entry.prepare_data()
+        with self.assertRaises(entry.StartupRefusal):entry.prepare_data()
         self.assertEqual(outside.read_text(),'unchanged')
         self.assertEqual(stat.S_IMODE(self.data.stat().st_mode),0o755)
     def test_hardlink_unknown_entry_and_directory_refused(self):
@@ -97,9 +99,53 @@ class PrivilegedSyscallTests(unittest.TestCase):
     def test_exec_is_fixed_and_only_after_drop(self):
         events=[]
         with patch.object(entry,'prepare_data',side_effect=lambda:events.append('prepare')), \
-             patch.object(entry,'drop_privileges',side_effect=lambda:events.append('drop')),patch.object(entry.os,'chdir'),patch.object(entry.os,'umask'), \
+             patch.object(entry,'drop_privileges',side_effect=lambda:(events.append('drop') or (10001,10001))),patch.object(entry.os,'chdir'),patch.object(entry.os,'umask'), \
              patch.dict(os.environ,{}),patch.object(entry.os,'execv',side_effect=lambda *x:events.append(('exec',x))):
             entry.main()
             self.assertEqual(events,['prepare','drop',('exec',('/usr/local/bin/node',['node','mcp_adapter/server.mjs']))])
+
+class DiagnosticTests(unittest.TestCase):
+    def test_each_reason_is_bounded_and_never_logs_exception_details(self):
+        for reason in entry.REASONS:
+            with self.subTest(reason=reason), patch.object(entry,'prepare_data',side_effect=entry.StartupRefusal(reason)), \
+                 patch.object(entry.os,'execv') as execute, redirect_stderr(io.StringIO()) as log:
+                self.assertEqual(entry.main(),1)
+                self.assertEqual(log.getvalue(),f'GPTopia startup refused reason={reason}\n')
+                execute.assert_not_called()
+    def test_unexpected_exception_never_leaks_sensitive_message(self):
+        with patch.object(entry,'prepare_data',side_effect=PermissionError('SECRET /private/file token=secret')), \
+             redirect_stderr(io.StringIO()) as log:
+            self.assertEqual(entry.main(),1)
+            self.assertEqual(log.getvalue(),'GPTopia startup refused reason=internal_error\n')
+    def test_injected_reason_is_not_printable(self):
+        self.assertEqual(entry.StartupRefusal('SECRET\n/path').reason,'internal_error')
+    def test_failed_drop_has_specific_code_and_no_readiness_marker(self):
+        for function,reason in [('setgroups','drop_groups'),('setresgid','drop_gid'),('setresuid','drop_uid')]:
+            with self.subTest(function=function), patch.object(entry,'prepare_data'), \
+                 patch.object(entry.os,'geteuid',return_value=0),patch.object(entry.os,'setgroups'), \
+                 patch.object(entry.os,'setresgid'),patch.object(entry.os,'setresuid'), \
+                 patch.object(entry.os,function,side_effect=PermissionError('SECRET')), \
+                 patch.object(entry.os,'execv') as execute,redirect_stderr(io.StringIO()) as log:
+                self.assertEqual(entry.main(),1)
+                self.assertEqual(log.getvalue(),f'GPTopia startup refused reason={reason}\n')
+                execute.assert_not_called()
+    def test_marker_only_after_verified_ids_and_before_exec(self):
+        with patch.object(entry,'prepare_data'),patch.object(entry.os,'geteuid',return_value=10001), \
+             patch.object(entry.os,'getresuid',return_value=(10001,)*3),patch.object(entry.os,'getresgid',return_value=(10001,)*3), \
+             patch.object(entry.os,'getgroups',return_value=[10001]),patch.object(entry.os,'chdir'),patch.object(entry.os,'umask'), \
+             patch.dict(os.environ,{}),redirect_stderr(io.StringIO()) as log:
+            def execute(*args):
+                self.assertEqual(log.getvalue(),'GPTopia startup identity_verified uid=10001 gid=10001 saved_ids_verified=true startup_boundary_ready=true application_ready=false\n')
+                raise OSError('SECRET exec error')
+            with patch.object(entry.os,'execv',side_effect=execute):
+                self.assertEqual(entry.main(),1)
+            self.assertTrue(log.getvalue().endswith('GPTopia startup refused reason=application_exec\n'))
+            self.assertNotIn('SECRET',log.getvalue())
+    def test_saved_root_identity_does_not_emit_marker(self):
+        with patch.object(entry,'prepare_data'),patch.object(entry.os,'geteuid',return_value=10001), \
+             patch.object(entry.os,'getresuid',return_value=(10001,10001,0)),patch.object(entry.os,'getresgid',return_value=(10001,)*3), \
+             patch.object(entry.os,'getgroups',return_value=[]),patch.object(entry.os,'execv') as execute,redirect_stderr(io.StringIO()) as log:
+            self.assertEqual(entry.main(),1)
+            self.assertEqual(log.getvalue(),'GPTopia startup refused reason=identity_verify\n');execute.assert_not_called()
 
 if __name__=='__main__':unittest.main()

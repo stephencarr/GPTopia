@@ -114,3 +114,28 @@ entrypoint drops privilege before networking. Only parent/deployment operator ma
 activate it after review; no variable was set by this implementation task.
 [Official volume permissions](https://docs.railway.com/volumes),
 [official runtime variable](https://docs.railway.com/variables/reference).
+
+### Safe startup diagnostics
+
+The initializer logs only an allowlisted `reason=<enum>` on refusal. Codes
+separate fixed-database config, startup identity, directory open/stat/list/owner,
+unexpected entries, file open/stat/ownership/type/mode, directory chown/chmod,
+privilege-drop groups/GID/UID, verified identity, runtime preparation and exec.
+No exception text, paths, entry names, environment values or tokens are logged.
+`unexpected_entry` does **not** prove any particular filename such as lost+found;
+do not relax validation based on a guess.
+
+After checking actual real/effective/saved identities and supplementary groups,
+the initializer emits `identity_verified uid=10001 gid=10001` with
+`saved_ids_verified=true startup_boundary_ready=true application_ready=false`.
+This confirms the checked initializer boundary, **not** that Node executed or
+SQLite is usable. Pair it with the existing worker-backed `/health`200 and
+observed deployment state. An exec error can follow the identity marker and is
+reported as `reason=application_exec` without exception details.
+
+Local configuration review did not establish the hosted refusal's cause.
+Directory entries, filesystem permissions/capabilities and actual UID/GID are
+runtime facts; the previous generic refusal cannot distinguish them. The new
+codes preserve all prior fail-closed checks. No root-network fallback or
+permission broadening is introduced. Actual diagnostic deployment remains a
+parent/reviewer decision, not part of local implementation.
