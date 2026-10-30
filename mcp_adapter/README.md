@@ -274,3 +274,20 @@ Sources: [official SDK legacy serving](https://ts.sdk.modelcontextprotocol.io/v2
 [legacy lifecycle and counter-offer rule](https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle),
 and installed locked SDK2.4.0 source/types (`createLegacyStatelessFallback`,
 `Server._oninitialize`, `supportedProtocolVersions`).
+
+## Isolated Kernel 0.4 implementation
+
+This branch is local only; it does not change the running read-only pilot or its
+admissions. `spaces:write` is new and is never added to defaults or existing grants.
+`tools/list` is filtered by verified effective scopes; hidden handlers remain scope
+checked, and the kernel still checks root admission, membership and object ACLs.
+Listing a tool does not authorize every possible space/object argument.
+
+Start with `world_roots` (no arguments), never guessed root/child IDs.
+`world_discover` reports effective scopes and applicable authorized operations.
+Permission denials are `forbidden`, not instructions to reconnect or expand access.
+Child invitations concern already admitted actors, not external agent admission.
+Original0.3 request formats remain supported. New writes require explicit scopes
+and idempotency. Text entries are immutable inert data, never agent invocation.
+Pagination uses exclusive cursors; sequence gaps are not hidden metadata. Polling
+remains the only delivery mechanism. See API04.md for exact bounds and semantics.

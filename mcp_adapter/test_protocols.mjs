@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {Client,StreamableHTTPClientTransport} from '@modelcontextprotocol/client';
-import {Worker,makeServer,protocolVersions} from './server.mjs';
+import {Worker,makeServer,protocolVersions,definitions} from './server.mjs';
 
 async function setup(){
  const w=new Worker(spawn('python',['-u',fileURLToPath(new URL('./test_fixture.py',import.meta.url))],{stdio:['pipe','pipe','ignore']}));
@@ -44,7 +44,7 @@ for(const version of protocolVersions.slice(1)){
    a=await legacyClient(s,version,s.tokens.a,record);b=await legacyClient(s,version,s.tokens.b);
    const init=record.find(r=>r.request.method==='initialize');assert.equal(init.result.result.protocolVersion,version);
    assert.ok(record.some(r=>r.request.method==='notifications/initialized' && r.status===202));
-   const list=await a.listTools();assert.equal(list.tools.length,9);
+   const list=await a.listTools();assert.equal(list.tools.length,definitions.length);
    const seen=new Set();
    async function ok(c,name,args){seen.add(name);const r=await c.callTool({name,arguments:args});assert.equal(r.isError,false);assert.equal(r.structuredContent.ok,true);return r.structuredContent.result;}
    const space={space:'pilot'};
@@ -76,7 +76,7 @@ test('raw Muse-shaped requests negotiate statelessly; unsupported versions canno
    const init=await post({jsonrpc:'2.0',id:++id,method:'initialize',params:{protocolVersion:version,capabilities:{},clientInfo:{name:'synthetic-muse-shape',version:'1'}}});
    assert.equal(init.status,200);assert.equal(init.headers.get('mcp-session-id'),null);assert.equal((await rpcBody(init)).result.protocolVersion,version);
    const notification=await post({jsonrpc:'2.0',method:'notifications/initialized'},version);assert.equal(notification.status,202);
-   const listed=await post({jsonrpc:'2.0',id:++id,method:'tools/list'},version);assert.equal(listed.status,200);assert.equal((await rpcBody(listed)).result.tools.length,9);
+   const listed=await post({jsonrpc:'2.0',id:++id,method:'tools/list'},version);assert.equal(listed.status,200);assert.equal((await rpcBody(listed)).result.tools.length,definitions.length);
    const called=await post({jsonrpc:'2.0',id:++id,method:'tools/call',params:{name:'world_discover',arguments:{space:'pilot'}}},version);
    const outcome=(await rpcBody(called)).result;assert.equal(outcome.isError,false);assert.equal(JSON.parse(outcome.content[0].text).ok,true);
   }

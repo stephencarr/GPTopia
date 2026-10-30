@@ -14,8 +14,8 @@ async function start(boundary,options={}) {
   await new Promise(resolve=>service.http.listen(0,'127.0.0.1',resolve));
   return {...service,url:`http://127.0.0.1:${service.http.address().port}`};
 }
-async function client(url,token) {
-  const c=new Client({name:'gptopia-synthetic-conformance',version:'1.0.0'},{versionNegotiation:{mode:{pin:'2026-07-28'}}});
+async function client(url,token,version='2026-07-28') {
+  const c=new Client({name:'gptopia-synthetic-conformance',version:'1.0.0'},version==='2026-07-28'?{versionNegotiation:{mode:{pin:version}}}:{supportedProtocolVersions:[version],versionNegotiation:{mode:'legacy'}});
   await c.connect(new StreamableHTTPClientTransport(new URL(url+'/mcp'),{requestInit:{headers:{authorization:'Bearer '+token}}}));
   return c;
 }
@@ -27,7 +27,7 @@ test('modern official SDK discovery, nine schema-validated tools, real JWT + dur
     a=await client(s.url,tokens.a); b=await client(s.url,tokens.b);
     const discovery=await a.discover();
     assert.ok(JSON.stringify(discovery).includes('2026-07-28'));assert.equal(discovery.capabilities.tools.listChanged,false);
-    const listed=await a.listTools();assert.equal(listed.tools.length,9);
+    const listed=await a.listTools();assert.equal(listed.tools.length,definitions.length);
     assert.deepEqual(listed.tools.map(t=>t.name).sort(),definitions.map(t=>t.name).sort());
     for(const t of listed.tools){assert.equal(t.inputSchema.additionalProperties,false);assert.ok(t.outputSchema);assert.ok(t._meta.securitySchemes);}
     const seen=new Set();
@@ -108,4 +108,51 @@ test('invalid advertised-scope environment exits before serving or spawning a wo
    });
    assert.notEqual(code,0);
  }
+});
+
+for(const version of ['2026-07-28','2025-11-25','2025-06-18','2025-03-26']) test(`0.4 ${version}: scope-filtered discovery, roots bootstrap and precise space denial`,async()=>{
+ const boundary=new Worker(spawn('python',['-u','test_fixture.py'],{stdio:['pipe','pipe','inherit']}));
+ const tokens=await boundary.request({action:'test_setup'});const s=await start(boundary);let reader,empty;
+ try {
+  reader=await client(s.url,tokens.readonly,version);empty=await client(s.url,tokens.noscope,version);
+  const listed=await reader.listTools();
+  assert.deepEqual(listed.tools.map(t=>t.name).sort(),definitions.filter(t=>t.requiredScopes.every(scope=>readOnlyScopes.includes(scope))).map(t=>t.name).sort());
+  assert.deepEqual((await empty.listTools()).tools,[]);
+  const roots=await reader.callTool({name:'world_roots',arguments:{}});assert.equal(roots.isError,false,JSON.stringify(roots));assert.ok(outputs.get('world_roots')(roots.structuredContent));
+  const discovery=await reader.callTool({name:'world_discover',arguments:{space:'pilot'}});assert.equal(discovery.isError,false);assert.deepEqual(discovery.structuredContent.result.effective_scopes,[...readOnlyScopes]);
+  assert.ok(!discovery.structuredContent.result.operations.includes('create'));
+  const denied=await reader.callTool({name:'world_discover',arguments:{space:'unknown'}});assert.equal(denied.isError,true);assert.equal(denied.structuredContent.error.code,'forbidden');assert.equal(denied._meta?.['mcp/www_authenticate'],undefined);
+  await assert.rejects(reader.callTool({name:'world_space_create',arguments:{space:'pilot',title:'denied',idempotency_key:'read-denied'}}),/scope/i);
+ }finally{await reader?.close();await empty?.close();await s.close();}
+});
+
+for(const version of ['2026-07-28','2025-11-25','2025-06-18','2025-03-26']) test(`0.4 ${version}: all new tools strict schemas; old object shapes remain valid`,async()=>{
+ const w=new Worker(spawn('python',['-u','test_fixture.py'],{stdio:['pipe','pipe','inherit']}));
+ const tokens=await w.request({action:'test_setup'});const s=await start(w);let a,b;
+ const seen=new Set();
+ try {
+  a=await client(s.url,tokens.a,version);b=await client(s.url,tokens.b,version);
+  async function ok(c,name,args){seen.add(name);const r=await c.callTool({name:'world_'+name,arguments:args});assert.equal(r.isError,false,JSON.stringify(r));assert.ok(outputs.get('world_'+name)(r.structuredContent),JSON.stringify(outputs.get('world_'+name).errors));return r.structuredContent.result;}
+  await ok(a,'roots',{});
+  const created=await ok(a,'space_create',{space:'pilot',title:'Shared workshop',idempotency_key:'space-new'});
+  const space=created.id;assert.deepEqual(await ok(a,'space_create',{space:'pilot',title:'Shared workshop',idempotency_key:'space-new'}),created);
+  await ok(a,'spaces',{space:'pilot'});
+  let state=await ok(a,'space_get',{space});
+  let invitation=await ok(a,'space_invite',{space,actor:'test-b',expected_version:state.version,idempotency_key:'invite'});
+  await ok(b,'space_get',{space});
+  await ok(b,'space_accept',{space,invite_id:invitation.id,idempotency_key:'join'});
+  await ok(a,'post',{space,content:'Inert shared entry',idempotency_key:'entry'});
+  const entries=await ok(b,'entries',{space});assert.equal(entries.items.length,1);
+  const object=await ok(a,'create',{space,content:'draft',title:'Plan',tags:['planning'],readers:['test-a','test-b'],writers:['test-a'],idempotency_key:'artifact'});
+  const catalog=await ok(b,'catalog',{space,tag:'planning'});assert.equal(catalog.items[0].id,object.id);assert.equal(catalog.items[0].title,'Plan');
+  await ok(a,'get',{space,id:object.id});await ok(a,'history',{space,id:object.id});
+  await ok(b,'space_leave',{space,idempotency_key:'leave'});
+  state=await ok(a,'space_get',{space});
+  invitation=await ok(a,'space_invite',{space,actor:'test-b',expected_version:state.version,idempotency_key:'reinvite'});
+  await ok(b,'space_accept',{space,invite_id:invitation.id,idempotency_key:'rejoin'});
+  state=await ok(a,'space_get',{space});
+  await ok(a,'space_remove',{space,actor:'test-b',expected_version:state.version,idempotency_key:'remove'});
+  const denied=await b.callTool({name:'world_entries',arguments:{space}});assert.equal(denied.isError,true);assert.equal(denied.structuredContent.error.code,'forbidden');
+  for(const name of ['roots','spaces','space_get','space_create','space_invite','space_accept','space_remove','space_leave','post','entries','catalog'])assert.ok(seen.has(name));
+ }finally{await a?.close();await b?.close();await s.close();}
 });

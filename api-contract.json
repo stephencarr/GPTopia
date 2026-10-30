@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "GPTopia local test kernel request contract",
-  "description": "A narrow prototype protocol, not an A2A or MCP implementation. Schema is documentation; runtime semantic ACL/UTF-8 checks remain authoritative. Python rejects booleans/floating-point JSON literals for integer arguments. No production authentication.",
+  "description": "Kernel0.4 isolated local implementation; narrow authenticated resource contract, not an A2A protocol. Original0.3 operation shapes remain supported. Schemas describe structural bounds; kernel UTF8 byte/ACL/membership/epoch checks are authoritative. No new live scopes or deployment implied.",
   "oneOf": [
     {
       "$ref": "#/$defs/discoverRequest"
@@ -29,6 +29,39 @@
     },
     {
       "$ref": "#/$defs/acceptRequest"
+    },
+    {
+      "$ref": "#/$defs/rootsRequest"
+    },
+    {
+      "$ref": "#/$defs/spacesRequest"
+    },
+    {
+      "$ref": "#/$defs/space_getRequest"
+    },
+    {
+      "$ref": "#/$defs/space_createRequest"
+    },
+    {
+      "$ref": "#/$defs/space_inviteRequest"
+    },
+    {
+      "$ref": "#/$defs/space_acceptRequest"
+    },
+    {
+      "$ref": "#/$defs/space_removeRequest"
+    },
+    {
+      "$ref": "#/$defs/space_leaveRequest"
+    },
+    {
+      "$ref": "#/$defs/postRequest"
+    },
+    {
+      "$ref": "#/$defs/entriesRequest"
+    },
+    {
+      "$ref": "#/$defs/catalogRequest"
     }
   ],
   "$defs": {
@@ -281,6 +314,22 @@
                 "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
               },
               "maxItems": 100
+            },
+            "title": {
+              "type": "string",
+              "maxLength": 120,
+              "description": "At most120 UTF8 bytes; authoritative byte bound enforced by kernel."
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 32,
+                "minLength": 1,
+                "description": "At most32 UTF8 bytes."
+              },
+              "maxItems": 8,
+              "uniqueItems": true
             }
           },
           "required": [
@@ -343,6 +392,22 @@
                 "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
               },
               "maxItems": 100
+            },
+            "title": {
+              "type": "string",
+              "maxLength": 120,
+              "description": "At most120 UTF8 bytes; authoritative byte bound enforced by kernel."
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 32,
+                "minLength": 1,
+                "description": "At most32 UTF8 bytes."
+              },
+              "maxItems": 8,
+              "uniqueItems": true
             }
           },
           "required": [
@@ -444,7 +509,10 @@
           }
         },
         "protocol": {
-          "const": "gptopia-kernel/0.3"
+          "enum": [
+            "gptopia-kernel/0.3",
+            "gptopia-kernel/0.4"
+          ]
         },
         "limits": {
           "type": "object",
@@ -479,9 +547,27 @@
               "create",
               "update",
               "send",
-              "accept"
+              "accept",
+              "roots",
+              "spaces",
+              "space_get",
+              "space_create",
+              "space_invite",
+              "space_accept",
+              "space_remove",
+              "space_leave",
+              "post",
+              "entries",
+              "catalog"
             ]
           }
+        },
+        "effective_scopes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
         }
       },
       "required": [
@@ -545,6 +631,22 @@
         },
         "acceptance": {
           "$ref": "#/$defs/acceptanceStatus"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 120,
+          "description": "At most120 UTF8 bytes; authoritative byte bound enforced by kernel."
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "description": "At most32 UTF8 bytes."
+          },
+          "maxItems": 8,
+          "uniqueItems": true
         }
       },
       "required": [
@@ -607,6 +709,22 @@
         },
         "acceptance": {
           "$ref": "#/$defs/acceptanceStatus"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 120,
+          "description": "At most120 UTF8 bytes; authoritative byte bound enforced by kernel."
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "description": "At most32 UTF8 bytes."
+          },
+          "maxItems": 8,
+          "uniqueItems": true
         }
       },
       "required": [
@@ -1206,6 +1324,39 @@
             "result"
           ],
           "additionalProperties": false
+        },
+        {
+          "$ref": "#/$defs/rootsResponse"
+        },
+        {
+          "$ref": "#/$defs/spacesResponse"
+        },
+        {
+          "$ref": "#/$defs/space_getResponse"
+        },
+        {
+          "$ref": "#/$defs/space_createResponse"
+        },
+        {
+          "$ref": "#/$defs/space_inviteResponse"
+        },
+        {
+          "$ref": "#/$defs/space_acceptResponse"
+        },
+        {
+          "$ref": "#/$defs/space_removeResponse"
+        },
+        {
+          "$ref": "#/$defs/space_leaveResponse"
+        },
+        {
+          "$ref": "#/$defs/postResponse"
+        },
+        {
+          "$ref": "#/$defs/entriesResponse"
+        },
+        {
+          "$ref": "#/$defs/catalogResponse"
         }
       ]
     },
@@ -1408,9 +1559,1152 @@
           "$ref": "#/$defs/errorResponse"
         }
       ]
+    },
+    "spaceMember": {
+      "type": "object",
+      "properties": {
+        "actor": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        },
+        "epoch": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "actor",
+        "epoch"
+      ],
+      "additionalProperties": false
+    },
+    "spaceInvitation": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        },
+        "expires_at": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "expires_at"
+      ],
+      "additionalProperties": false
+    },
+    "space_getResult": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        },
+        "root": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        },
+        "owner": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 120,
+          "description": "At most120 UTF8 bytes; authoritative byte bound enforced by kernel."
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "created": {
+          "type": "number"
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/spaceMember"
+          },
+          "maxItems": 10
+        },
+        "invitation": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/spaceInvitation"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "root",
+        "owner",
+        "title",
+        "version",
+        "created",
+        "members",
+        "invitation"
+      ],
+      "additionalProperties": false
+    },
+    "rootsResult": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+              }
+            },
+            "required": [
+              "id"
+            ],
+            "additionalProperties": false
+          },
+          "maxItems": 20
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "additionalProperties": false
+    },
+    "spacesResult": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/space_getResult"
+          },
+          "maxItems": 100
+        },
+        "next_cursor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "scanned": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 500
+        },
+        "has_more": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "items",
+        "next_cursor",
+        "scanned",
+        "has_more"
+      ],
+      "additionalProperties": false
+    },
+    "space_createResult": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        },
+        "root": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "event": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "id",
+        "root",
+        "version",
+        "event"
+      ],
+      "additionalProperties": false
+    },
+    "space_inviteResult": {
+      "type": "object",
+      "properties": {
+        "space": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        },
+        "actor": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        },
+        "expires_at": {
+          "type": "number"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "event": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "space",
+        "id",
+        "actor",
+        "expires_at",
+        "version",
+        "event"
+      ],
+      "additionalProperties": false
+    },
+    "space_acceptResult": {
+      "type": "object",
+      "properties": {
+        "space": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        },
+        "actor": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        },
+        "epoch": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "event": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "space",
+        "actor",
+        "epoch",
+        "version",
+        "event"
+      ],
+      "additionalProperties": false
+    },
+    "space_removeResult": {
+      "type": "object",
+      "properties": {
+        "space": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        },
+        "actor": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        },
+        "active": {
+          "const": false
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "event": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "space",
+        "actor",
+        "active",
+        "version",
+        "event"
+      ],
+      "additionalProperties": false
+    },
+    "space_leaveResult": {
+      "type": "object",
+      "properties": {
+        "space": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        },
+        "actor": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        },
+        "active": {
+          "const": false
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "event": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "space",
+        "actor",
+        "active",
+        "version",
+        "event"
+      ],
+      "additionalProperties": false
+    },
+    "postResult": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        },
+        "event": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "id",
+        "event"
+      ],
+      "additionalProperties": false
+    },
+    "entryRecord": {
+      "type": "object",
+      "properties": {
+        "seq": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        },
+        "space": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        },
+        "author": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        },
+        "content": {
+          "$ref": "#/$defs/content"
+        },
+        "created": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "seq",
+        "id",
+        "space",
+        "author",
+        "content",
+        "created"
+      ],
+      "additionalProperties": false
+    },
+    "entriesResult": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/entryRecord"
+          },
+          "maxItems": 100
+        },
+        "next_cursor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "scanned": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 500
+        },
+        "has_more": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "items",
+        "next_cursor",
+        "scanned",
+        "has_more"
+      ],
+      "additionalProperties": false
+    },
+    "catalogRecord": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        },
+        "space": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        },
+        "owner": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 120,
+          "description": "At most120 UTF8 bytes; authoritative byte bound enforced by kernel."
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 1,
+            "description": "At most32 UTF8 bytes."
+          },
+          "maxItems": 8,
+          "uniqueItems": true
+        },
+        "content_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "created": {
+          "type": "number"
+        },
+        "author": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        }
+      },
+      "required": [
+        "id",
+        "space",
+        "owner",
+        "version",
+        "title",
+        "tags",
+        "content_sha256",
+        "created",
+        "author"
+      ],
+      "additionalProperties": false
+    },
+    "catalogResult": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/catalogRecord"
+          },
+          "maxItems": 100
+        },
+        "next_cursor": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9223372036854775807
+        },
+        "scanned": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 500
+        },
+        "has_more": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "items",
+        "next_cursor",
+        "scanned",
+        "has_more"
+      ],
+      "additionalProperties": false
+    },
+    "rootsRequest": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "const": "roots"
+        },
+        "args": {
+          "type": "object",
+          "properties": {},
+          "required": [],
+          "additionalProperties": false
+        },
+        "idempotency_key": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        }
+      },
+      "required": [
+        "op",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    "rootsResponse": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "const": true
+            },
+            "result": {
+              "$ref": "#/$defs/rootsResult"
+            }
+          },
+          "required": [
+            "ok",
+            "result"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "$ref": "#/$defs/errorResponse"
+        }
+      ]
+    },
+    "spacesRequest": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "const": "spaces"
+        },
+        "args": {
+          "type": "object",
+          "properties": {
+            "space": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+            },
+            "after": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9223372036854775807
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          "required": [
+            "space"
+          ],
+          "additionalProperties": false
+        },
+        "idempotency_key": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        }
+      },
+      "required": [
+        "op",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    "spacesResponse": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "const": true
+            },
+            "result": {
+              "$ref": "#/$defs/spacesResult"
+            }
+          },
+          "required": [
+            "ok",
+            "result"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "$ref": "#/$defs/errorResponse"
+        }
+      ]
+    },
+    "space_getRequest": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "const": "space_get"
+        },
+        "args": {
+          "type": "object",
+          "properties": {
+            "space": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+            }
+          },
+          "required": [
+            "space"
+          ],
+          "additionalProperties": false
+        },
+        "idempotency_key": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        }
+      },
+      "required": [
+        "op",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    "space_getResponse": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "const": true
+            },
+            "result": {
+              "$ref": "#/$defs/space_getResult"
+            }
+          },
+          "required": [
+            "ok",
+            "result"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "$ref": "#/$defs/errorResponse"
+        }
+      ]
+    },
+    "space_createRequest": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "const": "space_create"
+        },
+        "args": {
+          "type": "object",
+          "properties": {
+            "space": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+            },
+            "title": {
+              "type": "string",
+              "maxLength": 120,
+              "description": "At most120 UTF8 bytes; authoritative byte bound enforced by kernel."
+            }
+          },
+          "required": [
+            "space",
+            "title"
+          ],
+          "additionalProperties": false
+        },
+        "idempotency_key": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        }
+      },
+      "required": [
+        "op",
+        "args",
+        "idempotency_key"
+      ],
+      "additionalProperties": false
+    },
+    "space_createResponse": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "const": true
+            },
+            "result": {
+              "$ref": "#/$defs/space_createResult"
+            }
+          },
+          "required": [
+            "ok",
+            "result"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "$ref": "#/$defs/errorResponse"
+        }
+      ]
+    },
+    "space_inviteRequest": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "const": "space_invite"
+        },
+        "args": {
+          "type": "object",
+          "properties": {
+            "space": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+            },
+            "actor": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "required": [
+            "space",
+            "actor",
+            "expected_version"
+          ],
+          "additionalProperties": false
+        },
+        "idempotency_key": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        }
+      },
+      "required": [
+        "op",
+        "args",
+        "idempotency_key"
+      ],
+      "additionalProperties": false
+    },
+    "space_inviteResponse": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "const": true
+            },
+            "result": {
+              "$ref": "#/$defs/space_inviteResult"
+            }
+          },
+          "required": [
+            "ok",
+            "result"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "$ref": "#/$defs/errorResponse"
+        }
+      ]
+    },
+    "space_acceptRequest": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "const": "space_accept"
+        },
+        "args": {
+          "type": "object",
+          "properties": {
+            "space": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+            },
+            "invite_id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+            }
+          },
+          "required": [
+            "space",
+            "invite_id"
+          ],
+          "additionalProperties": false
+        },
+        "idempotency_key": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        }
+      },
+      "required": [
+        "op",
+        "args",
+        "idempotency_key"
+      ],
+      "additionalProperties": false
+    },
+    "space_acceptResponse": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "const": true
+            },
+            "result": {
+              "$ref": "#/$defs/space_acceptResult"
+            }
+          },
+          "required": [
+            "ok",
+            "result"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "$ref": "#/$defs/errorResponse"
+        }
+      ]
+    },
+    "space_removeRequest": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "const": "space_remove"
+        },
+        "args": {
+          "type": "object",
+          "properties": {
+            "space": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+            },
+            "actor": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+            },
+            "expected_version": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "required": [
+            "space",
+            "actor",
+            "expected_version"
+          ],
+          "additionalProperties": false
+        },
+        "idempotency_key": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        }
+      },
+      "required": [
+        "op",
+        "args",
+        "idempotency_key"
+      ],
+      "additionalProperties": false
+    },
+    "space_removeResponse": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "const": true
+            },
+            "result": {
+              "$ref": "#/$defs/space_removeResult"
+            }
+          },
+          "required": [
+            "ok",
+            "result"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "$ref": "#/$defs/errorResponse"
+        }
+      ]
+    },
+    "space_leaveRequest": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "const": "space_leave"
+        },
+        "args": {
+          "type": "object",
+          "properties": {
+            "space": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+            }
+          },
+          "required": [
+            "space"
+          ],
+          "additionalProperties": false
+        },
+        "idempotency_key": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        }
+      },
+      "required": [
+        "op",
+        "args",
+        "idempotency_key"
+      ],
+      "additionalProperties": false
+    },
+    "space_leaveResponse": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "const": true
+            },
+            "result": {
+              "$ref": "#/$defs/space_leaveResult"
+            }
+          },
+          "required": [
+            "ok",
+            "result"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "$ref": "#/$defs/errorResponse"
+        }
+      ]
+    },
+    "postRequest": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "const": "post"
+        },
+        "args": {
+          "type": "object",
+          "properties": {
+            "space": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+            },
+            "content": {
+              "$ref": "#/$defs/content"
+            }
+          },
+          "required": [
+            "space",
+            "content"
+          ],
+          "additionalProperties": false
+        },
+        "idempotency_key": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        }
+      },
+      "required": [
+        "op",
+        "args",
+        "idempotency_key"
+      ],
+      "additionalProperties": false
+    },
+    "postResponse": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "const": true
+            },
+            "result": {
+              "$ref": "#/$defs/postResult"
+            }
+          },
+          "required": [
+            "ok",
+            "result"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "$ref": "#/$defs/errorResponse"
+        }
+      ]
+    },
+    "entriesRequest": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "const": "entries"
+        },
+        "args": {
+          "type": "object",
+          "properties": {
+            "space": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+            },
+            "after": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9223372036854775807
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          "required": [
+            "space"
+          ],
+          "additionalProperties": false
+        },
+        "idempotency_key": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        }
+      },
+      "required": [
+        "op",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    "entriesResponse": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "const": true
+            },
+            "result": {
+              "$ref": "#/$defs/entriesResult"
+            }
+          },
+          "required": [
+            "ok",
+            "result"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "$ref": "#/$defs/errorResponse"
+        }
+      ]
+    },
+    "catalogRequest": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "const": "catalog"
+        },
+        "args": {
+          "type": "object",
+          "properties": {
+            "space": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+            },
+            "after": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9223372036854775807
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "tag": {
+              "type": "string",
+              "maxLength": 32,
+              "minLength": 1,
+              "description": "At most32 UTF8 bytes."
+            }
+          },
+          "required": [
+            "space"
+          ],
+          "additionalProperties": false
+        },
+        "idempotency_key": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        }
+      },
+      "required": [
+        "op",
+        "args"
+      ],
+      "additionalProperties": false
+    },
+    "catalogResponse": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "const": true
+            },
+            "result": {
+              "$ref": "#/$defs/catalogResult"
+            }
+          },
+          "required": [
+            "ok",
+            "result"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "$ref": "#/$defs/errorResponse"
+        }
+      ]
     }
   },
-  "x-protocol": "gptopia-kernel/0.3",
+  "x-protocol": "gptopia-kernel/0.4",
   "x-transport": {
     "method": "POST",
     "path": "/v1",
@@ -1546,6 +2840,127 @@
       "responseSchema": {
         "$ref": "#/$defs/acceptResponse"
       }
+    },
+    "roots": {
+      "requestSchema": {
+        "$ref": "#/$defs/rootsRequest"
+      },
+      "resultSchema": {
+        "$ref": "#/$defs/rootsResult"
+      },
+      "responseSchema": {
+        "$ref": "#/$defs/rootsResponse"
+      }
+    },
+    "spaces": {
+      "requestSchema": {
+        "$ref": "#/$defs/spacesRequest"
+      },
+      "resultSchema": {
+        "$ref": "#/$defs/spacesResult"
+      },
+      "responseSchema": {
+        "$ref": "#/$defs/spacesResponse"
+      }
+    },
+    "space_get": {
+      "requestSchema": {
+        "$ref": "#/$defs/space_getRequest"
+      },
+      "resultSchema": {
+        "$ref": "#/$defs/space_getResult"
+      },
+      "responseSchema": {
+        "$ref": "#/$defs/space_getResponse"
+      }
+    },
+    "space_create": {
+      "requestSchema": {
+        "$ref": "#/$defs/space_createRequest"
+      },
+      "resultSchema": {
+        "$ref": "#/$defs/space_createResult"
+      },
+      "responseSchema": {
+        "$ref": "#/$defs/space_createResponse"
+      }
+    },
+    "space_invite": {
+      "requestSchema": {
+        "$ref": "#/$defs/space_inviteRequest"
+      },
+      "resultSchema": {
+        "$ref": "#/$defs/space_inviteResult"
+      },
+      "responseSchema": {
+        "$ref": "#/$defs/space_inviteResponse"
+      }
+    },
+    "space_accept": {
+      "requestSchema": {
+        "$ref": "#/$defs/space_acceptRequest"
+      },
+      "resultSchema": {
+        "$ref": "#/$defs/space_acceptResult"
+      },
+      "responseSchema": {
+        "$ref": "#/$defs/space_acceptResponse"
+      }
+    },
+    "space_remove": {
+      "requestSchema": {
+        "$ref": "#/$defs/space_removeRequest"
+      },
+      "resultSchema": {
+        "$ref": "#/$defs/space_removeResult"
+      },
+      "responseSchema": {
+        "$ref": "#/$defs/space_removeResponse"
+      }
+    },
+    "space_leave": {
+      "requestSchema": {
+        "$ref": "#/$defs/space_leaveRequest"
+      },
+      "resultSchema": {
+        "$ref": "#/$defs/space_leaveResult"
+      },
+      "responseSchema": {
+        "$ref": "#/$defs/space_leaveResponse"
+      }
+    },
+    "post": {
+      "requestSchema": {
+        "$ref": "#/$defs/postRequest"
+      },
+      "resultSchema": {
+        "$ref": "#/$defs/postResult"
+      },
+      "responseSchema": {
+        "$ref": "#/$defs/postResponse"
+      }
+    },
+    "entries": {
+      "requestSchema": {
+        "$ref": "#/$defs/entriesRequest"
+      },
+      "resultSchema": {
+        "$ref": "#/$defs/entriesResult"
+      },
+      "responseSchema": {
+        "$ref": "#/$defs/entriesResponse"
+      }
+    },
+    "catalog": {
+      "requestSchema": {
+        "$ref": "#/$defs/catalogRequest"
+      },
+      "resultSchema": {
+        "$ref": "#/$defs/catalogResult"
+      },
+      "responseSchema": {
+        "$ref": "#/$defs/catalogResponse"
+      }
     }
   },
   "x-semantics": {
@@ -1615,5 +3030,5 @@
       "configuration": "Reviewed scopes/expiry may change via config/restart; immutable binding cannot. Verifier captures detached frozen admission snapshot. client_claim other than azp fails."
     }
   },
-  "x-localRevisionStatus": "0.3 local source revision; not deployed by this task"
+  "x-localRevisionStatus": "isolated local implementation; no deployment or new grants"
 }
