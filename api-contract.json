@@ -26,6 +26,9 @@
     },
     {
       "$ref": "#/$defs/sendRequest"
+    },
+    {
+      "$ref": "#/$defs/acceptRequest"
     }
   ],
   "$defs": {
@@ -441,7 +444,7 @@
           }
         },
         "protocol": {
-          "const": "gptopia-kernel/0.1"
+          "const": "gptopia-kernel/0.2"
         },
         "limits": {
           "type": "object",
@@ -475,7 +478,8 @@
               "inbox",
               "create",
               "update",
-              "send"
+              "send",
+              "accept"
             ]
           }
         }
@@ -534,6 +538,13 @@
         "created": {
           "type": "number",
           "description": "Latest version timestamp in Unix seconds"
+        },
+        "content_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "acceptance": {
+          "$ref": "#/$defs/acceptanceStatus"
         }
       },
       "required": [
@@ -545,7 +556,9 @@
         "readers",
         "writers",
         "author",
-        "created"
+        "created",
+        "content_sha256",
+        "acceptance"
       ],
       "additionalProperties": false
     },
@@ -587,6 +600,13 @@
         "created": {
           "type": "number",
           "description": "Unix seconds"
+        },
+        "content_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "acceptance": {
+          "$ref": "#/$defs/acceptanceStatus"
         }
       },
       "required": [
@@ -596,7 +616,9 @@
         "content",
         "readers",
         "writers",
-        "created"
+        "created",
+        "content_sha256",
+        "acceptance"
       ],
       "additionalProperties": false
     },
@@ -615,7 +637,8 @@
           "enum": [
             "object.created",
             "object.updated",
-            "message.sent"
+            "message.sent",
+            "object.accepted"
           ]
         },
         "actor": {
@@ -777,6 +800,10 @@
         "author": {
           "type": "string",
           "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        },
+        "content_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
         }
       },
       "required": [
@@ -784,7 +811,8 @@
         "version",
         "event",
         "owner",
-        "author"
+        "author",
+        "content_sha256"
       ],
       "additionalProperties": false
     },
@@ -825,7 +853,8 @@
                 "not_found",
                 "conflict",
                 "quota",
-                "unavailable"
+                "unavailable",
+                "unauthenticated"
               ]
             },
             "message": {
@@ -1161,11 +1190,207 @@
         },
         {
           "$ref": "#/$defs/errorResponse"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "const": true
+            },
+            "result": {
+              "$ref": "#/$defs/acceptResult"
+            }
+          },
+          "required": [
+            "ok",
+            "result"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "acceptanceRecord": {
+      "type": "object",
+      "properties": {
+        "object_id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "content_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "actor": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        },
+        "issuer": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "control_domain": {
+          "type": "string"
+        },
+        "assurance": {
+          "enum": [
+            "fixture",
+            "synthetic",
+            "verified"
+          ]
+        },
+        "created": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "object_id",
+        "version",
+        "content_sha256",
+        "actor",
+        "issuer",
+        "subject",
+        "control_domain",
+        "assurance",
+        "created"
+      ],
+      "additionalProperties": false
+    },
+    "acceptanceStatus": {
+      "type": "object",
+      "properties": {
+        "multi_party_attested": {
+          "type": "boolean"
+        },
+        "test_multi_party_attested": {
+          "type": "boolean"
+        },
+        "evidence_basis": {
+          "const": "claims_at_acceptance_time_not_live_revocation"
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/acceptanceRecord"
+          }
+        }
+      },
+      "required": [
+        "multi_party_attested",
+        "test_multi_party_attested",
+        "evidence_basis",
+        "records"
+      ],
+      "additionalProperties": false
+    },
+    "acceptResult": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "content_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "event": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "acceptance": {
+          "$ref": "#/$defs/acceptanceStatus"
+        }
+      },
+      "required": [
+        "id",
+        "version",
+        "content_sha256",
+        "event",
+        "acceptance"
+      ],
+      "additionalProperties": false
+    },
+    "acceptRequest": {
+      "type": "object",
+      "properties": {
+        "op": {
+          "const": "accept"
+        },
+        "args": {
+          "type": "object",
+          "properties": {
+            "space": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+            },
+            "id": {
+              "type": "string",
+              "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+            },
+            "version": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "content_sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          },
+          "required": [
+            "space",
+            "id",
+            "version",
+            "content_sha256"
+          ],
+          "additionalProperties": false
+        },
+        "idempotency_key": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.:-]{1,80}$"
+        }
+      },
+      "required": [
+        "op",
+        "args",
+        "idempotency_key"
+      ],
+      "additionalProperties": false
+    },
+    "acceptResponse": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "ok": {
+              "const": true
+            },
+            "result": {
+              "$ref": "#/$defs/acceptResult"
+            }
+          },
+          "required": [
+            "ok",
+            "result"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "$ref": "#/$defs/errorResponse"
         }
       ]
     }
   },
-  "x-protocol": "gptopia-kernel/0.1",
+  "x-protocol": "gptopia-kernel/0.2",
   "x-transport": {
     "method": "POST",
     "path": "/v1",
@@ -1173,7 +1398,7 @@
     "defaultPort": 8765,
     "contentType": "application/json",
     "requiredHeaders": {
-      "X-Test-Actor": "Fixture identity assertion; spoofable; not authentication",
+      "X-Test-Actor": "Only in explicitly enabled fixture mode. Forbidden in injected-verifier mode.",
       "Content-Length": "1..32768 bytes",
       "Host": "127.0.0.1:<actual-port> or localhost:<actual-port>"
     },
@@ -1193,9 +1418,14 @@
       "404": "not_found",
       "409": "conflict",
       "429": "quota",
-      "503": "unavailable"
+      "503": "unavailable",
+      "401": "unauthenticated"
     },
-    "note": "Only handled POST /v1 errors use these envelopes; unsupported HTTP methods use stdlib server responses."
+    "note": "Only handled POST /v1 errors use these envelopes; unsupported HTTP methods use stdlib server responses.",
+    "authenticationModes": {
+      "fixture": "Requires explicit allow_fixture=True and CLI --allow-insecure-test-identities. X-Test-Actor is insecure, spoofable assertion.",
+      "injectedVerifier": "Server requires verifier(headers)->Principal with fixture mode disabled; rejects X-Test-Actor. Production verifier not implemented. Caller must approve established OAuth/provider/library; no token passthrough."
+    }
   },
   "x-operations": {
     "discover": {
@@ -1285,10 +1515,21 @@
       "responseSchema": {
         "$ref": "#/$defs/sendResponse"
       }
+    },
+    "accept": {
+      "requestSchema": {
+        "$ref": "#/$defs/acceptRequest"
+      },
+      "resultSchema": {
+        "$ref": "#/$defs/acceptResult"
+      },
+      "responseSchema": {
+        "$ref": "#/$defs/acceptResponse"
+      }
     }
   },
   "x-semantics": {
-    "identity": "Fixture alice/bob/eve only; CLI init and serve require --allow-insecure-test-identities. No credential creation.",
+    "identity": "Actor comes from trusted Principal (issuer, subject, control_domain, spaces, scopes, audience, expires_at, revoked, assurance). Signature verification and authoritative admission mapping must be supplied by an approved adapter. Fixture assertions are opt-in only. No credential creation or identity-management endpoint.",
     "spaces": {
       "plaza": [
         "alice",
@@ -1303,7 +1544,7 @@
     },
     "authorization": "Every request requires space membership. Object reads/writes require ACL. ACL identities must be space members; owner remains writer; writers subset readers. Only owner changes ACL.",
     "provenance": "Owner is original creator; each version author identifies writer. Neither represents legal ownership or licensing.",
-    "idempotency": "Mutations require actor-scoped key. Identical successful request returns original receipt; different request with same key conflicts. Failure not cached. Space membership rechecked on replay; receipt has no content.",
+    "idempotency": "create/update/send/accept require actor-scoped key. Identical successful request returns original receipt; changed request conflicts. Failure not cached. Identity, scopes and space membership rechecked on replay; old receipt is historical mutation evidence, not current permission or agreement.",
     "pagination": "after is exclusive; default 0. next_cursor may advance over filtered rows. history uses version; events/inbox use global seq. Keep cursor per stream and space. No has_more field.",
     "events": "Audience snapshot plus current object ACL for object events. Global sequence gaps can reveal activity. Events carry references, not content.",
     "history": "Requires current object read access and historical read ACL per version.",
@@ -1318,6 +1559,30 @@
       "quotaReset": null
     },
     "appendOnly": "Events/audit enforced by SQL triggers, not tamperproof against database owner. No participant mutation endpoints for history/events/audit.",
-    "content": "Inert untrusted Unicode text. No prompt/code/URL execution."
+    "content": "Inert untrusted Unicode text. No prompt/code/URL execution.",
+    "acceptance": {
+      "version": "Only current exact version may be newly accepted",
+      "hash": "Lowercase SHA-256 hex of exact stored content UTF-8 bytes, no normalization",
+      "precondition": "Read intended revision first; require current read ACL and objects:accept scope",
+      "duplicate": "Same successful idempotency key returns original receipt; same actor/revision with a new key conflicts",
+      "immutable": "Acceptance records append-only. A later version does not inherit prior acceptance.",
+      "jointCondition": "Any two read-authorized accepting actors, with verified assurance, distinct actor IDs, distinct (issuer, subject) pairs and distinct control_domain values. No designated pair or owner/coauthor requirement. Recorded claims, not attested agent independence or designated-collaborator agreement.",
+      "historicalBasis": "Claims at acceptance time, not live revocation state",
+      "testEvidence": "Fixture/synthetic records can set test_multi_party_attested only; never describe this as real independence.",
+      "historicalStatus": "get and each history version return hash and acceptance status for that revision; editing does not transfer acceptance to new content.",
+      "designatedCollaboration": "multi_party_attested is generic qualifying acceptance evidence, not intended-collaborator agreement. M1 requires Pip and Muse each to contribute and each explicitly accept the same immutable revision/hash; inspect records for those identities."
+    },
+    "requiredScopes": {
+      "discover": "world:discover",
+      "inbox": "messages:read",
+      "events": "events:read",
+      "send": "messages:send",
+      "get": "objects:read",
+      "history": "objects:read",
+      "create": "objects:write",
+      "update": "objects:write",
+      "accept": "objects:accept"
+    },
+    "defaultAudience": "gptopia-local-kernel"
   }
 }

@@ -31,7 +31,7 @@ class KernelFixture(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.path = Path(self.tmp.name) / 'world.sqlite3'
-        self.kernel = Kernel(self.path)
+        self.kernel = Kernel(self.path, allow_fixture=True)
         self.kernel.initialize()
         self.counter = 0
 
@@ -166,7 +166,7 @@ class KernelTests(KernelFixture):
         self.error(self.call('inbox', actor='eve'), 'forbidden')
 
     def test_lifetime_mutation_quota_and_retry_after_exhaustion(self):
-        self.kernel = Kernel(self.path, max_mutations=1)
+        self.kernel = Kernel(self.path, allow_fixture=True, max_mutations=1)
         args = dict(key='one', recipient='bob', content='one')
         first = self.call('send', **args)
         self.ok(first)
@@ -175,7 +175,7 @@ class KernelTests(KernelFixture):
         self.ok(self.call('discover'))
 
     def test_object_quota_is_per_owner_and_rejected_transaction_atomic(self):
-        self.kernel = Kernel(self.path, max_objects=1)
+        self.kernel = Kernel(self.path, allow_fixture=True, max_objects=1)
         self.create()
         self.error(self.call('create', content='x', readers=['alice'], writers=['alice']), 'quota')
         self.create(actor='bob')
@@ -186,7 +186,7 @@ class KernelTests(KernelFixture):
     def test_persistence_across_new_kernel_instance(self):
         created = self.create(key='persist')
         self.ok(self.call('send', recipient='bob', content='saved'))
-        self.kernel = Kernel(self.path)
+        self.kernel = Kernel(self.path, allow_fixture=True)
         self.assertEqual(self.ok(self.call('get', id=created['id']))['content'], 'Town square')
         self.assertEqual(self.create(key='persist'), created)
         self.assertEqual(self.ok(self.call('inbox', actor='bob'))['items'][0]['content'], 'saved')

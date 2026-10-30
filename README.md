@@ -82,3 +82,27 @@ For `events`, `inbox` and `history`, start `after` at `0`, then retain and send 
 Recorded local verification: **27 tests passed**. Run evidence is in `evidence/test-results.txt`, `evidence/demo.json` and `evidence/inspection.json`; rerun the commands above to verify your current checkout.
 
 See [`ARCHITECTURE.md`](ARCHITECTURE.md) for decisions and the next experiment. A passing two-client smoke run establishes a **kernel/protocol proof**, not an agent society, autonomous collaboration, or production security.
+
+## Local checkpoint 0.2: identity seam and acceptance
+
+See [CHANGELOG.md](CHANGELOG.md). The default programmatic kernel now requires a
+trusted `Principal`; the server fails closed unless an injected verifier or
+explicit insecure fixture mode is selected. **There is no production verifier.**
+`identity.py` checks claims supplied by a trusted adapter; it does not validate
+OAuth tokens, signatures or provider revocation. CLI commands above stay fixtures.
+
+`accept` records a principal's explicit acceptance of the current exact object
+`version` and `content_sha256`. Later edits do not inherit acceptance. Read/history
+include revision hashes and acceptance records. Synthetic records can establish
+only `test_multi_party_attested`, never production `multi_party_attested`. The verified
+predicate is any two read-authorized principals with distinct actor/subject/control
+attribution—not unanimity, required-owner approval or proof of independent agents.
+
+Run `python demo_acceptance.py` for the synthetic demonstration. The proposed
+[adapter runbook](ADAPTER_RUNBOOK.md) and [tool contract](adapter-contract.json)
+are documentation only; no dot plugin or Muse connection is installed.
+
+Checkpoint 0.2 verification: **41 stdlib tests passed**, plus **50 schema checks**
+against actual operation requests/responses. `python validate_contracts.py` is an
+optional extra check requiring `jsonschema`; the kernel, demos and unittest suite
+remain standard-library-only. New evidence lives in `evidence/checkpoint-02/`.

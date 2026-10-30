@@ -10,13 +10,14 @@ import uuid
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from identity import Principal, AuthenticationError, fixture, validate
 
 MAX_BODY = 32768
 MAX_CONTENT = 8192
 DEFAULT_MUTATIONS = 1000
 DEFAULT_OBJECTS = 100
 IDENT = re.compile(r'^[a-zA-Z0-9_.:-]{1,80}$')
-MUTATIONS = {'create', 'update', 'send'}
+MUTATIONS = {'create', 'update', 'send', 'accept'}
 
 class Fault(Exception):
     def __init__(self, code, message):
@@ -48,6 +49,9 @@ CREATE TABLE IF NOT EXISTS objects(id TEXT PRIMARY KEY, space TEXT NOT NULL, own
 CREATE TABLE IF NOT EXISTS versions(object_id TEXT NOT NULL, version INTEGER NOT NULL, author TEXT NOT NULL, content TEXT NOT NULL, readers TEXT NOT NULL, writers TEXT NOT NULL, created REAL NOT NULL, PRIMARY KEY(object_id,version));
 CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY, space TEXT NOT NULL, sender TEXT NOT NULL, recipient TEXT NOT NULL, content TEXT NOT NULL, created REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS events(seq INTEGER PRIMARY KEY AUTOINCREMENT, space TEXT NOT NULL, kind TEXT NOT NULL, actor TEXT NOT NULL, subject TEXT NOT NULL, version INTEGER, audience TEXT NOT NULL, created REAL NOT NULL);
+CREATE TABLE IF NOT EXISTS acceptances(object_id TEXT NOT NULL, version INTEGER NOT NULL, content_sha256 TEXT NOT NULL, actor TEXT NOT NULL, issuer TEXT NOT NULL, subject TEXT NOT NULL, control_domain TEXT NOT NULL, assurance TEXT NOT NULL, created REAL NOT NULL, PRIMARY KEY(object_id,version,actor));
+CREATE TRIGGER IF NOT EXISTS acceptance_no_update BEFORE UPDATE ON acceptances BEGIN SELECT RAISE(ABORT,'immutable acceptance'); END;
+CREATE TRIGGER IF NOT EXISTS acceptance_no_delete BEFORE DELETE ON acceptances BEGIN SELECT RAISE(ABORT,'immutable acceptance'); END;
 CREATE TABLE IF NOT EXISTS retries(actor TEXT NOT NULL, key TEXT NOT NULL, digest TEXT NOT NULL, response TEXT NOT NULL, PRIMARY KEY(actor,key));
 CREATE TABLE IF NOT EXISTS usage(actor TEXT PRIMARY KEY, mutations INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS audit(seq INTEGER PRIMARY KEY AUTOINCREMENT, actor TEXT, op TEXT, outcome TEXT NOT NULL, created REAL NOT NULL);
@@ -58,8 +62,9 @@ CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit BEGIN SELECT
 '''
 
 class Kernel:
-    def __init__(self, path, max_mutations=DEFAULT_MUTATIONS, max_objects=DEFAULT_OBJECTS):
+    def __init__(self, path, max_mutations=DEFAULT_MUTATIONS, max_objects=DEFAULT_OBJECTS, allow_fixture=False):
         self.path = str(path)
+        self.allow_fixture = allow_fixture
         self.max_mutations, self.max_objects = max_mutations, max_objects
 
     @contextmanager
@@ -114,14 +119,12 @@ class Kernel:
                 result[key] = json.loads(result[key])
         return result
 
-    def request(self, actor, request):
+    def request(self, identity, request):
+        actor = identity.actor if isinstance(identity, Principal) else identity
         op = request.get('op') if isinstance(request, dict) else None
         with self.connection() as db:
             db.execute('BEGIN IMMEDIATE')
             try:
-                name(actor, 'actor')
-                if not db.execute('SELECT 1 FROM identities WHERE id=?', (actor,)).fetchone():
-                    raise Fault('forbidden', 'unknown test identity')
                 if not isinstance(request, dict) or set(request) - {'op', 'args', 'idempotency_key'}:
                     raise Fault('invalid', 'request fields are op, args, idempotency_key')
                 args = request.get('args', {})
@@ -130,6 +133,16 @@ class Kernel:
                 if not isinstance(op, str) or op not in {'discover', 'get', 'history', 'events', 'inbox'} | MUTATIONS:
                     raise Fault('invalid', 'unknown operation')
                 space = name(args.get('space'), 'space')
+                try:
+                    principal = fixture(identity) if isinstance(identity, str) and self.allow_fixture else identity
+                    principal = validate(principal, op, space)
+                    if principal.assurance == 'fixture' and not self.allow_fixture:
+                        raise AuthenticationError('fixture identities disabled')
+                except AuthenticationError as exc:
+                    raise Fault('unauthenticated', str(exc))
+                name(actor, 'actor')
+                if not db.execute('SELECT 1 FROM identities WHERE id=?', (actor,)).fetchone():
+                    raise Fault('forbidden', 'identity not admitted')
                 self.member(db, space, actor)
                 key = digest = None
                 if op in MUTATIONS:
@@ -151,7 +164,7 @@ class Kernel:
                     used = db.execute('SELECT mutations FROM usage WHERE actor=?', (actor,)).fetchone()
                     if used and used[0] >= self.max_mutations:
                         raise Fault('quota', 'lifetime mutation quota exceeded')
-                result = self.dispatch(db, actor, op, space, args)
+                result = self.dispatch(db, actor, op, space, args, principal)
                 response = {'ok': True, 'result': result}
                 if op in MUTATIONS:
                     db.execute('INSERT INTO retries VALUES (?,?,?,?)', (actor, key, digest, encode(response)))
@@ -168,26 +181,29 @@ class Kernel:
     def audit(self, db, actor, op, outcome):
         db.execute('INSERT INTO audit(actor,op,outcome,created) VALUES (?,?,?,?)', (actor, op, outcome, time.time()))
 
-    def dispatch(self, db, actor, op, space, a):
+    def dispatch(self, db, actor, op, space, a, principal):
         allowed = {
             'discover': {'space'}, 'get': {'space', 'id'}, 'history': {'space', 'id', 'after', 'limit'},
             'events': {'space', 'after', 'limit'}, 'inbox': {'space', 'after', 'limit'},
             'create': {'space', 'content', 'readers', 'writers'},
             'update': {'space', 'id', 'expected_version', 'content', 'readers', 'writers'},
             'send': {'space', 'recipient', 'content'},
+            'accept': {'space', 'id', 'version', 'content_sha256'},
         }
         if set(a) - allowed[op]:
             raise Fault('invalid', 'unknown argument')
         if op == 'discover':
             return {'identities': [self.record(r) for r in db.execute('SELECT i.* FROM identities i JOIN members m ON i.id=m.actor WHERE m.space=? ORDER BY i.id', (space,))],
-                    'protocol': 'gptopia-kernel/0.1', 'limits': {'content_bytes': MAX_CONTENT, 'mutation_quota': self.max_mutations, 'objects_per_owner': self.max_objects},
+                    'protocol': 'gptopia-kernel/0.2', 'limits': {'content_bytes': MAX_CONTENT, 'mutation_quota': self.max_mutations, 'objects_per_owner': self.max_objects},
                     'operations': sorted(allowed)}
-        if op in {'get', 'history', 'update'}:
+        if op in {'get', 'history', 'update', 'accept'}:
             row = self.obj(db, space, name(a.get('id'), 'id'), actor, op == 'update')
         if op == 'get':
             result = self.record(row)
             latest = db.execute('SELECT author,created FROM versions WHERE object_id=? AND version=?', (row['id'], row['version'])).fetchone()
             result.update(dict(latest))
+            result['content_sha256'] = self.content_hash(row['content'])
+            result['acceptance'] = self.acceptance_status(db, row['id'], row['version'], result['content_sha256'])
             return result
         if op in {'events', 'history', 'inbox'}:
             after, limit = a.get('after', 0), a.get('limit', 50)
@@ -200,7 +216,10 @@ class Kernel:
             for r in rows:
                 cursor = r['version']
                 if actor in json.loads(r['readers']):
-                    out.append(self.record(r))
+                    item = self.record(r)
+                    item['content_sha256'] = self.content_hash(r['content'])
+                    item['acceptance'] = self.acceptance_status(db, r['object_id'], r['version'], item['content_sha256'])
+                    out.append(item)
                 if len(out) >= limit:
                     break
             return {'items': out, 'next_cursor': cursor}
@@ -224,6 +243,18 @@ class Kernel:
         if op == 'inbox':
             rows = db.execute("SELECT e.seq,m.* FROM events e JOIN messages m ON e.subject=m.id WHERE e.kind='message.sent' AND m.space=? AND m.recipient=? AND e.seq>? ORDER BY e.seq LIMIT ?", (space, actor, after, limit)).fetchall()
             return {'items': [dict(r) for r in rows], 'next_cursor': rows[-1]['seq'] if rows else after}
+        if op == 'accept':
+            digest = self.content_hash(row['content'])
+            if type(a.get('version')) is not int or a['version'] != row['version'] or a.get('content_sha256') != digest:
+                raise Fault('conflict', 'acceptance requires the current exact revision and SHA-256')
+            old = db.execute('SELECT * FROM acceptances WHERE object_id=? AND version=? AND actor=?', (row['id'], row['version'], actor)).fetchone()
+            if old:
+                raise Fault('conflict', 'actor already accepted this revision; reuse the original retry key')
+            db.execute('INSERT INTO acceptances VALUES (?,?,?,?,?,?,?,?,?)',
+                       (row['id'], row['version'], digest, actor, principal.issuer, principal.subject, principal.control_domain, principal.assurance, time.time()))
+            seq = self.event(db, space, 'object.accepted', actor, row['id'], json.loads(row['readers']), row['version'])
+            return {'id': row['id'], 'version': row['version'], 'content_sha256': digest, 'event': seq,
+                    'acceptance': self.acceptance_status(db, row['id'], row['version'], digest)}
         if op == 'send':
             recipient = name(a.get('recipient'), 'recipient')
             self.member(db, space, recipient)
@@ -250,19 +281,36 @@ class Kernel:
                    (oid, space, owner, version, body, encode(readers), encode(writers)))
         db.execute('INSERT INTO versions VALUES (?,?,?,?,?,?,?)', (oid, version, actor, body, encode(readers), encode(writers), time.time()))
         seq = self.event(db, space, 'object.' + ('created' if op == 'create' else 'updated'), actor, oid, readers, version)
-        return {'id': oid, 'version': version, 'event': seq, 'owner': owner, 'author': actor}
+        return {'id': oid, 'version': version, 'event': seq, 'owner': owner, 'author': actor, 'content_sha256': self.content_hash(body)}
+
+    @staticmethod
+    def content_hash(body):
+        return hashlib.sha256(body.encode('utf-8')).hexdigest()
+
+    def acceptance_status(self, db, oid, version, digest):
+        rows = [dict(r) for r in db.execute('SELECT * FROM acceptances WHERE object_id=? AND version=? AND content_sha256=? ORDER BY actor', (oid, version, digest))]
+        def independent(items):
+            return any(a['actor'] != b['actor'] and (a['issuer'],a['subject']) != (b['issuer'],b['subject']) and a['control_domain'] != b['control_domain'] for a in items for b in items)
+        verified = [r for r in rows if r['assurance'] == 'verified']
+        return {'multi_party_attested': independent(verified), 'test_multi_party_attested': independent(rows) and not independent(verified),
+                'evidence_basis': 'claims_at_acceptance_time_not_live_revocation', 'records': rows}
 
 class Server(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
-    def __init__(self, address, kernel):
+    def __init__(self, address, kernel, verifier=None):
         if address[0] != '127.0.0.1':
             raise ValueError('test kernel can bind only to 127.0.0.1')
+        if verifier is None and not kernel.allow_fixture:
+            raise ValueError('fail closed: approved principal verifier required')
+        if verifier is not None and kernel.allow_fixture:
+            raise ValueError('verifier mode and insecure fixture mode cannot be mixed')
         self.kernel = kernel
+        self.verifier = verifier
         super().__init__(address, Handler)
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = 'GPTopiaTestKernel/0.1'
+    server_version = 'GPTopiaTestKernel/0.2'
     def log_message(self, *args):
         pass
     def setup(self):
@@ -281,9 +329,20 @@ class Handler(BaseHTTPRequestHandler):
             if not 0 < length <= MAX_BODY:
                 raise ValueError('body size')
             request = json.loads(self.rfile.read(length), parse_constant=lambda _: (_ for _ in ()).throw(ValueError('nonfinite JSON')))
-            result = self.server.kernel.request(self.headers.get('X-Test-Actor'), request)
-            status = 200 if result['ok'] else {'forbidden': 403, 'not_found': 404, 'conflict': 409, 'quota': 429}.get(result['error']['code'], 400)
+            if self.server.verifier is not None:
+                if self.headers.get('X-Test-Actor') is not None:
+                    raise AuthenticationError('fixture sender assertion forbidden in verifier mode')
+                try:
+                    principal = self.server.verifier(self.headers)
+                except Exception:
+                    raise AuthenticationError('identity verification failed')
+            else:
+                principal = self.headers.get('X-Test-Actor')
+            result = self.server.kernel.request(principal, request)
+            status = 200 if result['ok'] else {'unauthenticated': 401, 'forbidden': 403, 'not_found': 404, 'conflict': 409, 'quota': 429}.get(result['error']['code'], 400)
             self.reply(status, result)
+        except AuthenticationError as exc:
+            self.reply(401, {'ok': False, 'error': {'code': 'unauthenticated', 'message': str(exc)}})
         except (ValueError, UnicodeError, RecursionError):
             self.reply(400, {'ok': False, 'error': {'code': 'invalid', 'message': 'invalid JSON or body size'}})
         except sqlite3.OperationalError:
@@ -304,7 +363,7 @@ def main():
     parser.add_argument('--port', type=int, default=8765)
     parser.add_argument('--allow-insecure-test-identities', action='store_true')
     args = parser.parse_args()
-    kernel = Kernel(args.db)
+    kernel = Kernel(args.db, allow_fixture=args.allow_insecure_test_identities)
     if args.command in {'init', 'serve'} and not args.allow_insecure_test_identities:
         parser.error('this fixture harness requires --allow-insecure-test-identities; never expose publicly')
     if args.command == 'init':
@@ -326,7 +385,7 @@ def main():
             parser.error('database not found')
         with sqlite3.connect(f'file:{Path(args.db).resolve()}?mode=ro', uri=True) as db:
             db.row_factory = sqlite3.Row
-            print(encode({table: [dict(r) for r in db.execute(f'SELECT * FROM {table}')] for table in ['identities', 'members', 'objects', 'versions', 'messages', 'events', 'usage', 'audit']}))
+            print(encode({table: [dict(r) for r in db.execute(f'SELECT * FROM {table}')] for table in ['identities', 'members', 'objects', 'versions', 'messages', 'events', 'acceptances', 'usage', 'audit']}))
 
 if __name__ == '__main__':
     main()
