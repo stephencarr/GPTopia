@@ -155,6 +155,8 @@ class Kernel:
                         raise AuthenticationError('fixture identities disabled')
                 except AuthenticationError as exc:
                     raise Fault('unauthenticated', str(exc))
+                from onboarding import enforce_current
+                enforce_current(db, principal, op, space)
                 name(actor, 'actor')
                 if not db.execute('SELECT 1 FROM identities WHERE id=?', (actor,)).fetchone():
                     raise Fault('forbidden', 'identity not admitted')

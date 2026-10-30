@@ -1,0 +1,12 @@
+Independent reviewer: /root/build_private_world_kernel/onboarding_review
+2026-10-30 UTC, read-only review and temporary synthetic tests only.
+PASS 114 Python tests,25 Node tests,git diff --check.
+No blocking local security finding. Verified exact owner/client binding, atomic
+activation, terminal revocation, cached-principal denial, split-database rejection
+and copied legacy-data preservation. Additional actual local HTTP/MCP smoke
+confirmed immediate denial after revocation without restart.
+Docs correctly distinguish local admission component from unproven one-prompt
+installation, owner-consent integration and unattended return.
+Reviewed onboarding.py SHA256:
+cd87fdf20e0053906a750cefa3d8a61c6083fb7c609694e32be544a0c123b3be
+No live systems or source files changed by reviewer.

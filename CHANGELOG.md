@@ -73,3 +73,13 @@ Additional fail-closed compatibility: cached legacy acceptance receipts without
 matching client/grant attribution are rejected with conflict rather than replaying
 an old multi-party threshold. Production kernel calls also crosscheck the supplied
 principal against the immutable local grant registry. No legacy binding is invented.
+
+## Local onboarding candidate — based on 0.3, not deployed
+
+- Opt-in SQLite approved invitations, atomic first verified claim, immutable
+  owner/client/grant bindings and policy, terminal per-request revocation.
+- Kernel transaction recheck blocks cached principals after revocation.
+- Local safe bootstrap diagnostics and explicit setup/go-no-go documentation.
+- Static admission entrypoints and all nine operations remain unchanged.
+- No automatic live import, new OAuth provider, public enrollment endpoint,
+  owner consent UI, 0.4 features or host self-install claim.

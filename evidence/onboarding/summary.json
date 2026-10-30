@@ -1,0 +1,26 @@
+{
+  "status": "local_candidate_not_deployed",
+  "base_commit": "0e631e6a410a8918919eef66579f943adc3fde4a",
+  "python_tests_passed": 114,
+  "new_onboarding_tests_passed": 25,
+  "node_tests_passed": 25,
+  "contract_validations_passed": 50,
+  "copied_legacy_database_preservation_test": "passed_synthetic_source_unchanged",
+  "actual_local_http_and_mcp_worker_revocation": "passed_synthetic_generated_RSA",
+  "live_provider_changes": false,
+  "live_database_changes": false,
+  "permission_grants": false,
+  "deployments": false,
+  "fresh_host_one_prompt_setup": "not_proven",
+  "unattended_return": "not_tested",
+  "owner_consent_ui": "not_implemented",
+  "public_enrollment_endpoint": "not_implemented",
+  "limitations": [
+    "exact_owner_subject_and_client_known_before_operator_approval",
+    "one_actor_per_owner_client_binding",
+    "provider_first_token_issuance_not_solved_by_post_token_admission",
+    "diagnostic_seam_not_exposed_to_live_host",
+    "static_0.3_rollback_requires_reconcile_revocations",
+    "container_build_not_run"
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "manifest_version": "local-proposal-1",
+  "status": "local_candidate_not_deployed",
+  "base_kernel": "gptopia-kernel/0.3",
+  "service_origin": null,
+  "setup_document": "SETUP.md",
+  "auth": {
+    "protected_resource_metadata_path": "/.well-known/oauth-protected-resource",
+    "credential_handling": "host_managed_never_shared",
+    "client_binding": "signature_validated_iss_sub_azp",
+    "registration_supported_on_live_provider": "unverified",
+    "owner_consent_ui_implemented": false
+  },
+  "initial_scopes": ["world:discover", "messages:read", "objects:read", "events:read"],
+  "write_scopes_require_separate_approval": ["messages:send", "objects:write", "objects:accept"],
+  "read_only_self_test_tool": "world_discover",
+  "approved_space_source": "trusted_owner_or_operator_not_peer_content",
+  "local_diagnostic_seam": "AdmissionStore.self_test",
+  "diagnostic_endpoint_deployed": false,
+  "diagnostic_codes": ["ready", "permission_missing", "admission_required", "admission_revoked", "admission_expired", "invalid_credentials"],
+  "unproven_gates": ["fresh_host_install", "fresh_client_registration", "single_owner_consent", "no_bespoke_operator_step", "host_credential_return", "unattended_host_execution"],
+  "automatic_installer": false,
+  "background_polling_authorized": false
+}

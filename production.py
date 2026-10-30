@@ -117,14 +117,18 @@ class JWTVerifier:
     """Only approved issuer keys and operator-maintained admission grant trusted.
 
     No token issuance, dynamic issuer discovery, payload-selected URLs, fixture
-    credentials or custom cryptography. Revocation: remove admission/redeploy;
-    access token lifetime capped at one hour; grant expiry capped externally.
+    credentials or custom cryptography. Static mode revokes by config/redeploy;
+    optional durable mode rechecks persisted status each call. Token lifetime is
+    capped at one hour; admission expiry remains bounded independently.
     """
-    def __init__(self, issuer, resource, jwks_url, admissions, client_claim='azp', key_client=None):
+    def __init__(self, issuer, resource, jwks_url, admissions, client_claim='azp', key_client=None, admission_store=None):
         self.issuer, self.resource = https_url(issuer), resource_origin(resource)
         https_url(jwks_url)
         if client_claim != 'azp':
             raise ValueError('only Auth0 default access-token profile signed azp is supported')
+        if admission_store is not None and (admissions or admission_store.owner[0] != self.issuer):
+            raise ValueError('durable admissions require matching issuer and no static grants')
+        self.admission_store = admission_store
         validated = validate_admissions(admissions)
         if any(g['issuer'] != self.issuer for g in validated.values()):
             raise ValueError('admission issuer differs from configured issuer')
@@ -148,6 +152,8 @@ class JWTVerifier:
                 raise ValueError('scope')
             if not bounded_text(c.get('sub')) or not bounded_text(c.get('azp')):
                 raise ValueError('missing owner/client binding')
+            if self.admission_store is not None:
+                return self.admission_store.resolve(c)
             match = self.bindings.get((c['iss'], c['sub'], c['azp']))
             if not match:
                 raise ValueError('not admitted')
@@ -158,6 +164,8 @@ class JWTVerifier:
                              frozenset(grant['spaces']), frozenset(c['scope'].split()) & frozenset(grant['scopes']),
                              AUDIENCE, min(c['exp'], grant['expires_at']), assurance='verified',
                              client_id=c['azp'], grant_id=grant_id)
+        except AuthenticationError:
+            raise
         except Exception:
             raise AuthenticationError('invalid credentials') from None
 
@@ -184,8 +192,16 @@ def advertised_scopes_from_env():
     return advertised_scope_list(value)
 
 
+def validate_store_database(verifier, db_path, admissions):
+    """A split store/world DB would lose the transaction-time revocation guard."""
+    store = getattr(verifier, 'admission_store', None)
+    if store is not None and (Path(store.path).resolve() != Path(db_path).resolve() or admissions):
+        raise ValueError('durable verifier requires same world database and no static imports')
+
+
 def create_app(db_path, resource=None, issuer=None, verifier=None, admissions=None, deadline=0, advertised_scopes=None):
     """No verifier/deadline means all application routes deny, health stays live."""
+    validate_store_database(verifier, db_path, admissions)
     advertised_scopes = advertised_scope_list(advertised_scopes)
     admissions = validate_admissions({} if admissions is None else admissions)
     if resource is not None:

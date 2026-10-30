@@ -11,11 +11,12 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from identity import Principal
 from kernel import Kernel, initialize_schema
-from production import JWTVerifier, validate_admissions, register_admissions
+from production import JWTVerifier, validate_admissions, register_admissions, validate_store_database
 
 
 class Boundary:
     def __init__(self, db_path, verifier=None, admissions=None, deadline=0):
+        validate_store_database(verifier, db_path, admissions)
         admissions = validate_admissions({} if admissions is None else admissions)
         self.verifier, self.deadline = verifier, deadline
         if deadline and not time.time() < deadline <= time.time() + 7 * 86400:

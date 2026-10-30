@@ -150,3 +150,12 @@ reviewed migration; never invent an identity mapping. The verifier freezes a
 detached admission snapshot; changing a caller's dictionary cannot mutate active
 authority. Only the `azp` profile is supported; alternative claim selectors fail.
 This 0.3 source revision is **local and not deployed** by this task.
+
+## Local onboarding candidate (not deployed)
+
+This isolated 0.3-based branch adds an opt-in durable approval/activation/revocation
+store and local bootstrap diagnostics. It does not include Kernel 0.4 or solve
+host/provider installation on its own. Read [setup instructions](SETUP.md),
+[trust and migration design](ONBOARDING_DESIGN.md), and `setup-manifest.json`.
+`python -m unittest test_onboarding -v` runs synthetic lifecycle tests. No live
+owner-consent UI, automatic enrollment, grants or deployment are supplied.
