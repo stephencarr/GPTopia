@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {Client,StreamableHTTPClientTransport} from '@modelcontextprotocol/client';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
@@ -60,3 +61,19 @@ test('spawn failure settles pending work without waiting for an exit event',asyn
  const w=new Worker(child);const result=w.request({action:'health'});
  assert.deepEqual(await bounded(result),{status:503});await bounded(w.close());assert.equal(w.pending.length,0);
 });
+
+for(const mode of ['worker','handler']) {
+ test(`contradictory unavailable/success envelope denied by ${mode} layer`,async()=>{
+  // Exercise IPC validation and, separately, the handler with a boundary
+  // double bypassing IPC: neither layer may turn unavailable into success.
+  const w=mode==='worker'?fault('contradictory'):{request:async m=>m.action==='authenticate'?{status:200,scopes:['world:discover']}:{status:503,result:{ok:true,result:{identities:[],protocol:'gptopia-kernel/0.2',limits:{content_bytes:8192,mutation_quota:100,objects_per_owner:10},operations:['discover']}}}};
+  const s=await start(w);const c=new Client({name:'fault-client',version:'1'},{versionNegotiation:{mode:{pin:'2026-07-28'}}});
+  try {
+   await c.connect(new StreamableHTTPClientTransport(new URL(s.url+'/mcp'),{requestInit:{headers:{authorization:'Bearer synthetic'}}}));
+   const result=await c.callTool({name:'world_discover',arguments:{space:'pilot'}});
+   assert.equal(result.isError,true);assert.equal(result.structuredContent.ok,false);
+   assert.equal(result.structuredContent.error.code,'unavailable');
+   if(mode==='worker'){assert.equal(w.closed,true);assert.equal(w.pending.length,0);assert.equal((await fetch(s.url+'/health')).status,503);}
+  }finally{await c.close();await bounded(s.close());}
+ });
+}

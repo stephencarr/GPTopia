@@ -58,7 +58,7 @@ export class Worker {
   validReply(reply,next) {
     if (!reply || typeof reply!=='object' || Array.isArray(reply) || reply.id!==next.id ||
         ![200,400,401,403,413,429,503].includes(reply.status)) return false;
-    if (reply.status!==200) return true;
+    if (reply.status!==200) return Object.keys(reply).every(key=>key==='id' || key==='status');
     if (next.action==='authenticate') return Array.isArray(reply.scopes) && reply.scopes.every(s=>typeof s==='string');
     if (next.action==='call') return reply.result && typeof reply.result==='object' &&
       typeof reply.result.ok==='boolean' && (reply.result.ok ? 'result' in reply.result :
@@ -127,7 +127,7 @@ export function makeServer(boundary, {resource, issuer, publicHost}={}) {
       const {idempotency_key,...params}=args;
       const payload={op:t.kernelOperation,args:params,...(idempotency_key?{idempotency_key}:{})};
       const reply=await boundary.request({action:'call',token,payload});
-      const out=reply.result ?? {ok:false,error:{code:reply.status===401?'unauthenticated':reply.status===403?'forbidden':'unavailable',message:'Resource boundary denied this operation'}};
+      const out=(reply.status===200 ? reply.result : undefined) ?? {ok:false,error:{code:reply.status===401?'unauthenticated':reply.status===403?'forbidden':'unavailable',message:'Resource boundary denied this operation'}};
       return {content:[{type:'text',text:JSON.stringify(out)}],structuredContent:out,isError:!out.ok,...(reply.status===401?{_meta:{'mcp/www_authenticate':[`Bearer error="invalid_token", error_description="Resource authentication required"${resource?`, resource_metadata="${resource}${metadataPath}"`:''}`]}}:{})};
     });
     }

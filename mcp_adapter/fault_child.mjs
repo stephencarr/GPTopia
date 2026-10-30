@@ -5,6 +5,10 @@ if (mode==='stall' || mode==='shutdown') process.on('SIGTERM',()=>{});
 const lines=createInterface({input:process.stdin});
 lines.on('line',line=>{
  const m=JSON.parse(line);
+ if(mode==='contradictory'){
+  const response=m.action==='authenticate'?{status:200,scopes:['world:discover']}:{status:503,result:{ok:true,result:{identities:[],protocol:'gptopia-kernel/0.2',limits:{content_bytes:8192,mutation_quota:100,objects_per_owner:10},operations:['discover']}}};
+  process.stdout.write(JSON.stringify({...response,id:m.id})+'\n');return;
+ }
  if(mode==='exit'){process.exit(1);return;}
  if(mode==='stall' || mode==='shutdown')return;
  if(mode==='malformed'){process.stdout.write('not-json\n');return;}

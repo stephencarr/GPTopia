@@ -164,10 +164,16 @@ Killing a worker does **not** establish that an interrupted mutation rolled back
 a transaction may already have committed. Retry using the original idempotency
 key and inspect authoritative durable state; never silently replay with a new key.
 
-`test_faults.mjs` adds 13 synthetic subprocess tests to the three existing
+`test_faults.mjs` adds 15 synthetic fault tests to the three existing
 integration tests: exits/stalls, eight pending requests, overflow/recovery,
 malformed JSON/status shapes/IDs, partial/oversized output, failed spawn,
 health/protected HTTP503, and bounded shutdown with an in-flight HTTP request.
 Tests assert empty queues, cleared timers and child termination. The controlled
 fault child is test-only and excluded by the Docker build context. No fault
 injection uses real identities, credentials, external agents or hosted services.
+
+Independent review identified a contradictory IPC envelope (`status:503` plus a
+successful result). Non200 envelopes now permit only correlation ID and status;
+extra result/scope fields poison the worker. Independently, the MCP callback
+consumes a result only at status200. Two official-client regression tests cover
+both the real malformed child and a boundary double bypassing IPC validation.
