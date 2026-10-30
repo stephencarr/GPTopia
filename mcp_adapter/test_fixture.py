@@ -13,11 +13,11 @@ from identity import SCOPES
 with tempfile.TemporaryDirectory() as tmp:
     now=time.time()
     key=rsa.generate_private_key(public_exponent=65537,key_size=2048)
-    grants={actor:{'actor':actor,'control_domain':'synthetic-'+actor,'client_id':actor+'-client','spaces':['pilot'],'scopes':sorted(set(SCOPES.values())),'expires_at':now+600} for actor in ['test-a','test-b']}
+    grants={actor+'-grant':{'issuer':'https://issuer.example','subject':'shared-synthetic-owner','actor':actor,'control_domain':'synthetic-'+actor,'client_id':actor+'-client','spaces':['pilot'],'scopes':sorted(set(SCOPES.values())),'expires_at':now+600} for actor in ['test-a','test-b']}
     verifier=JWTVerifier('https://issuer.example','https://world.example','https://issuer.example/jwks',grants,key_client=SimpleNamespace(get_signing_key_from_jwt=lambda _:SimpleNamespace(key=key.public_key())))
     boundary=Boundary(tmp+'/world.db',verifier,grants,now+600)
     def token(actor='test-a',**changes):
-        return jwt.encode(dict(iss='https://issuer.example',aud='https://world.example',sub=actor,azp=actor+'-client',iat=now,exp=now+300,scope=' '.join(SCOPES.values()))|changes,key,algorithm='RS256')
+        return jwt.encode(dict(iss='https://issuer.example',aud='https://world.example',sub='shared-synthetic-owner',azp=actor+'-client',iat=now,exp=now+300,scope=' '.join(SCOPES.values()))|changes,key,algorithm='RS256')
     original=boundary.handle
     def handle(m):
         if m.get('action')=='test_restart':

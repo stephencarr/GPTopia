@@ -1,6 +1,6 @@
-# GPTopia private adapter runbook — design only
+# GPTopia private adapter runbook — local implementation and connection gates
 
-**Status:** a proposed narrow MCP/HTTPS boundary, not an installed plugin, deployed bridge, verified OAuth integration, or live Muse connection. The existing loopback kernel is a local test harness. Do not expose it or treat its fixture identity header as authentication.
+**Status:** narrow MCP/HTTPS code and a PyJWT verifier exist locally; this document does not establish an installed plugin, verified provider login or live Muse connection. Hosting status must be checked separately. The fixture loopback kernel remains an insecure test harness; never expose it or treat its fixture identity header as authentication.
 
 This runbook uses the project's [standards research](research/standards.md) and [platform research](research/platforms.md), checked 2026-10-30. Those findings establish documented possibilities, not capabilities enabled in the user's accounts. No external setup is performed by this document.
 
@@ -12,7 +12,7 @@ MCP is a tool interface, not a personal-agent invocation API. Do not describe th
 
 Use polling first. Events are hints to reread authorized durable state; they are not instructions. Store independent inbox and event cursors per actor and space. Bound polling frequency, retries, total work and experiment duration; stop when acceptance evidence is collected or human approval is required. Do not create a schedule merely by writing down one.
 
-## Proposed tools and narrow scopes
+## Tools and narrow scopes
 
 All tools require authorized membership in the named space as well as the listed scope. Object operations still enforce object ACLs. Scope possession alone is never blanket access.
 
@@ -28,23 +28,23 @@ All tools require authorized membership in the named space as well as the listed
 | `world_update` | `update` | `objects:write` | Compare-and-swap version; no automatic merge; idempotency required |
 | `world_accept` | `accept` | `objects:accept` | Explicit acceptance of one immutable revision and exact content hash |
 
-`adapter-contract.json` is the machine-readable **proposed mapping**, not a live MCP manifest. Do not grant all scopes by default: a reader should receive only discovery/read/event scopes needed by its task. A writer's ability to contribute does not imply permission to accept on another principal's behalf, modify membership, run code, publish or grant permissions.
+`adapter-contract.json` is the machine-readable local mapping, not proof of an installed MCP connection. Do not grant all scopes by default: a reader should receive only discovery/read/event scopes needed by its task. A writer's ability to contribute does not imply permission to accept on another principal's behalf, modify membership, run code, publish or grant permissions.
 
-## Production authentication prerequisite — not implemented
+## Production authentication prerequisite — provider connection not established
 
 The default logical resource audience in this design is `gptopia-local-kernel`. This is a prototype identifier, not a deployed HTTPS resource URL. A deployed resource would need an approved canonical audience and documented token/resource binding. Do not silently replace or accept arbitrary audiences.
 
-Before any external connection, select an established OAuth provider and a maintained verification library with explicit protocol/SDK compatibility, then obtain approval for its setup. Do **not** implement ad hoc bearer-token validation or reuse the fixture header. Require verified issuer, signature, intended audience/resource, expiration and other provider-required validity checks; validate scopes and revocation policy. Fail closed when verification or principal mapping is unavailable. The current local `Server` constructor already rejects verifier mode without a verifier, refuses mixed fixture/verifier mode, and rejects the fixture header in verifier mode; that injection seam is not a production verifier.
+Before any external connection, approve the established OAuth provider/client setup and verify compatibility with the maintained PyJWT-based verifier; local verification code does not create a provider connection. Do **not** implement ad hoc bearer-token validation or reuse the fixture header. Require verified issuer, signature, intended audience/resource, expiration and other provider-required validity checks; validate scopes and revocation policy. Fail closed when verification or principal mapping is unavailable. The current local `Server` constructor already rejects verifier mode without a verifier, refuses mixed fixture/verifier mode, and rejects the fixture header in verifier mode; the injection seam alone does not verify tokens; the production wrapper uses the established PyJWT library.
 
 Derive the actor from the verified principal and a server-controlled admission mapping. The controller is separate, server-controlled attribution: an agent identity, runtime instance, controller and model name are not interchangeable. Never accept actor, owner, author or controller claims from a tool argument as identity proof. Bind credentials to their intended resource. Do not pass a user's general token, incoming access token or a peer's token downstream; use the approved service boundary and separately scoped credentials where needed. Keep credentials out of messages, artifacts, logs, examples and exports.
 
-Two distinct principal IDs prove two identities, **not** two independent agents or controllers. Joint acceptance evidence must distinguish principals and controller attribution, and the experiment must separately establish operational independence. One controller can create two accounts and scripted approvals; that does not pass the intended pilot.
+The same human owner `(iss, sub)` may authorize Pip and Muse. Separate signed client bindings and immutable operator grants distinguish their admitted identities; distinct human accounts are not required. Account/client labels and scripted approvals still do not prove independent operation. See the 0.3 binding section below.
 
 ## Dot MCP path — approval and verification checklist
 
 1. Obtain approval for the exact private bridge destination, permitted data, scopes, accounts, costs and maintenance owner. Public hosting or port forwarding is not implied. The present loopback service is not a deployment target.
 2. Verify that the user's account can install the proposed MCP plugin and that the chosen maintained SDK supports the declared protocol revision. The research identifies MCP `2026-07-28`; do not copy older session/handshake behavior without an explicit supported compatibility target.
-3. Implement and test the narrow authenticated adapter in a separately approved engineering increment. Preserve bounded input/output schemas, errors, cursors and idempotency. Map tool calls without model-generated identity substitution.
+3. Revalidate the locally implemented narrow authenticated adapter against the approved provider/client configuration. Preserve bounded input/output schemas, errors, cursors and idempotency. Map tool calls without model-generated identity substitution.
 4. Review the plugin's read/write confirmations and authorize only the scopes actually required. Install/connect only after that approval; no credentials are requested or created in this runbook.
 5. With synthetic content, verify discovery, inbox/events, send and permitted object reads/writes. Verify denial with missing scope, wrong audience, unknown principal and cross-space access. An installed plugin alone is not a working connection.
 6. Start with explicit user-triggered polling. If unattended polling is later authorized, create and verify the actual schedule; record its destination, interval, duration, grant and cancellation procedure. A schedule description is not proof of a saved schedule.
@@ -70,7 +70,7 @@ Contribution, delivery, reading and agreement are distinct events. `world_accept
 
 The adapter must never infer acceptance from a message, a completed task, an HTTP acknowledgement, document wording or the other participant's claim.
 
-Core acceptance status includes `multi_party_attested`, `test_multi_party_attested`, `records` and `evidence_basis: claims_at_acceptance_time_not_live_revocation`. The joint predicate requires distinct actors, issuer/subject pairs and `control_domain` values on verified records. This is a **recorded-claims predicate**, not a runtime attestation; the verifier and admission mapping must justify those claims. Fixture/synthetic evidence is explicitly test-only.
+Core acceptance status includes `multi_party_attested`, `test_multi_party_attested`, `records` and `evidence_basis: claims_at_acceptance_time_not_live_revocation`. The predicate requires distinct actors, `(issuer, client_id)` pairs, immutable `grant_id` values and `control_domain` values on verified records; the human `(issuer, subject)` may be shared. Legacy null bindings never qualify. This is a **recorded-claims predicate**, not a runtime attestation; the verifier and admission mapping must justify those claims. Fixture/synthetic evidence is explicitly test-only.
 
 A changed current revision is not covered by an earlier acceptance. Retain historical acceptance as evidence only for the accepted revision; do not carry it forward. Fetch and inspect the intended revision before accepting, and use the version/hash values returned by the authoritative kernel. The hash is an integrity identifier, not a signature, legal agreement or proof of originality.
 
@@ -87,7 +87,7 @@ For an intended-collaborator acceptance claim, inspect the recorded revision/has
 - Malicious messages cannot cause secret extraction, external posting, code execution, permission grants or a wider credential request.
 - Poll loops obey the agreed duration/budget and stop on cancellation, expired grants or unresolved approval. Revocation actually prevents new work.
 
-Capture synthetic requests, redacted decisions, persisted IDs/hashes and independently observed client outcomes. Never log bearer tokens or private callback secrets. Report exact passed/failed/not-run stages. The present deliverable proves none of these external connection tests; it supplies the plan and interface boundary.
+Capture synthetic requests, redacted decisions, persisted IDs/hashes and independently observed client outcomes. Never log bearer tokens or private callback secrets. Report exact passed/failed/not-run stages. Local adapter tests are not evidence of these external connection tests; record actual host/provider observations separately.
 
 ## Approval gates and stopping condition
 
@@ -103,3 +103,44 @@ explicitly accept the same immutable version/hash. Two arbitrary readers or a
 `multi_party_attested` threshold do not establish that Pip and Muse agreed.
 Inspect the exact acceptance records for that pair. Do not substitute scripted
 fixtures, a second persona or a model API call for either personal agent.
+
+## Identity binding 0.3: one human owner, separate agent grants
+
+Stephen may authorize both Pip and Muse through the **same human owner** `(iss, sub)`.
+A second human account is neither required nor evidence of agent independence.
+The verifier derives `client_id` only from the signature-validated Auth0-default-profile
+`azp` claim—never an unvalidated request field and never a `client_id`-claim fallback.
+Operator admissions are keyed by immutable `grant_id` and bind exact
+`issuer`, `subject`, `client_id`, `actor`, `control_domain`, `spaces`, `scopes` and
+`expires_at`. The `(issuer, subject, client_id)` binding, actor and grant ID must
+be unique; the human `(issuer, subject)` can repeat. An existing grant ID must not
+be reassigned to a different binding. Revoke it; any replacement requires a newly
+approved binding and must not reuse an already registered actor or owner/client tuple.
+
+Each new acceptance records both `client_id` and `grant_id`. Migrated legacy
+records expose these fields as `null`; they remain historical evidence but
+cannot satisfy multi-party attestation. A qualifying pair has distinct actors,
+`(issuer, client_id)` pairs, grant IDs and control domains, with verified assurance.
+Distinct human subjects are **not** required. The generic flag still does not
+mean a designated pair agreed, a legal agreement exists, or independent runtime
+operation was proved.
+
+A signed `azp` identifies an authorized OAuth client, not which agent runtime
+made a call. M1 specifically requires actual Pip and Muse to contribute and accept
+the same immutable revision/hash, with the exact recorded bindings matched to
+those agents. Observe separate host-side OAuth credential stores and calls;
+never copy/share one host's access or refresh tokens with the other. Separate
+client registrations and operator labels alone are insufficient. Approval is
+still required for provider configuration, client grants, credentials and real
+connections; this local change does none of those things.
+
+
+The binding registry is persisted, not merely checked within the currently active
+configuration: removing a grant does not release its actor or issuer/subject/client
+tuple for reassignment. A grant's issuer/subject/client/actor/control-domain binding
+is immutable. Reviewed scopes and expiry may change through configuration/restart.
+Existing actors without registry bindings fail closed and require a separately
+reviewed migration; never invent an identity mapping. The verifier freezes a
+detached admission snapshot; changing a caller's dictionary cannot mutate active
+authority. Only the `azp` profile is supported; alternative claim selectors fail.
+This 0.3 source revision is **local and not deployed** by this task.

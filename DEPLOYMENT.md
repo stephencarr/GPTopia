@@ -6,7 +6,7 @@ Checked 2026-10-30. **Local preparation, not a deployment or live connection.** 
 
 - `mcp_adapter/server.mjs`: official SDK2 modern MCP HTTP entrypoint and `/v1` route, both using one private Python stdio worker. `production.py` supplies the established-provider JWT verifier, not an OAuth issuer. Fresh schema has no Alice/Bob/Eve fixtures.
 - Defaults deny every application route. Only generic `/health` (`/healthz` alias) and, when configured, OAuth protected-resource discovery metadata are public. Both `/v1` and `/mcp` authenticate before payload read or writes; `/mcp` implements the nine narrow tools on MCP2026-07-28.
-- PyJWT validates fixed RS256 algorithm, issuer, audience, signature, required expiry/issued-at/subject, not-before, maximum one-hour token lifetime. Operator admissions bind subject AND OAuth client (`azp`) to actor, controller, spaces, intersected scopes and grant expiry. Internal `Principal.audience` remains the kernel's logical audience after external canonical HTTPS audience verification; this is not token passthrough.
+- PyJWT validates fixed RS256 algorithm, issuer, audience, signature, required expiry/issued-at/subject, not-before, maximum one-hour token lifetime. Operator admissions keyed by immutable grant ID bind exact issuer/subject AND OAuth client (validated signed `azp` only, no `client_id` fallback) to actor, control domain, spaces, intersected scopes and grant expiry. Human issuer/subject may be shared by distinct clients. Internal `Principal.audience` remains the kernel's logical audience after external canonical HTTPS audience verification; this is not token passthrough.
 - Configuration fails at startup before database initialization for malformed admission subjects, client bindings, actor/controller values, scopes, expiry or resource URLs. Resource must be an exact HTTPS origin without path/trailing slash; expired pilots reject before any JWKS work.
 - No custom crypto, token issuer, general-purpose execution, remote content fetch, fixture access, model calls, query/header/access logging or real secrets. JWKS uses only the operator-configured trusted URL. Unknown principals fail closed.
 - One Node process plus one private Python worker, 16 connections, 32 backlog, 10-second HTTP request/worker timeout, 32KiB request body, 8KiB artifact content, 60 HTTP authentication attempts/minute globally (up to two JWT checks per tool request). Lifetime persistent 10,000 application requests, 100 mutations and 10 objects per actor. Application grants/deadline close work within seven days. Deadline closure does **not** stop Railway billing.
@@ -33,7 +33,7 @@ Proposed concrete approval bundle (not yet authorized): dedicated GPTopia Auth0 
 
 Auth0's manual CIMD registration supports public `none`+PKCE; `private_key_jwt` requires Enterprise, and dynamic CIMD is Early Access. Predefined clients avoid that optional dependency. Do not accept a paid upgrade just to make the pilot connect. [Auth0 MCP setup](https://auth0.com/ai/docs/mcp/get-started/call-your-apis-on-users-behalf), [CIMD](https://auth0.com/docs/get-started/auth0-overview/create-applications/register-applications-with-cimd), [third-party application grants](https://auth0.com/docs/get-started/applications/third-party-applications/configure-third-party-applications).
 
-Muse has reported connector capability, not a completed OAuth connector. The specific blocking evidence is its supported OAuth authorization-code callback/secure credential storage/refresh path and a separately attributable admitted identity. Two clients with the same `iss`/`sub` do not meet the kernel's distinct-principal acceptance predicate; do not disguise one user login as two independent agents. If Muse supports only static API tokens, that is a separately scoped HTTPS adapter option requiring explicit credential approval—not a solution for Pip.
+Muse has reported connector capability, not a completed OAuth connector. The specific blocking evidence is its supported OAuth authorization-code callback/secure credential storage/refresh path and a separately attributable admitted identity. Pip and Muse may share Stephen's validated human `iss`/`sub`. They require distinct signed `azp` client bindings and immutable operator grants, plus separately observed host OAuth stores and calls with no copied/shared tokens; a shared human login does not itself disqualify them or establish independence. If Muse supports only static API tokens, that is a separately scoped HTTPS adapter option requiring explicit credential approval—not a solution for Pip.
 
 ## MCP implementation and remaining connection gate
 
@@ -156,3 +156,83 @@ that the next deployment will succeed. Actual mount/drop/readiness remain runtim
 gates. Tests cover the exact allowed inode metadata, wrong type/owner/group/mode,
 real symlink/file refusal, non-mutation and other-name rejection. Root ownership
 is simulated in the valid-directory test; no local privileged execution claimed.
+
+## Identity binding 0.3: one human owner, separate agent grants
+
+Stephen may authorize both Pip and Muse through the **same human owner** `(iss, sub)`.
+A second human account is neither required nor evidence of agent independence.
+The verifier derives `client_id` only from the signature-validated Auth0-default-profile
+`azp` claim—never an unvalidated request field and never a `client_id`-claim fallback.
+Operator admissions are keyed by immutable `grant_id` and bind exact
+`issuer`, `subject`, `client_id`, `actor`, `control_domain`, `spaces`, `scopes` and
+`expires_at`. The `(issuer, subject, client_id)` binding, actor and grant ID must
+be unique; the human `(issuer, subject)` can repeat. An existing grant ID must not
+be reassigned to a different binding. Revoke it; any replacement requires a newly
+approved binding and must not reuse an already registered actor or owner/client tuple.
+
+Each new acceptance records both `client_id` and `grant_id`. Migrated legacy
+records expose these fields as `null`; they remain historical evidence but
+cannot satisfy multi-party attestation. A qualifying pair has distinct actors,
+`(issuer, client_id)` pairs, grant IDs and control domains, with verified assurance.
+Distinct human subjects are **not** required. The generic flag still does not
+mean a designated pair agreed, a legal agreement exists, or independent runtime
+operation was proved.
+
+A signed `azp` identifies an authorized OAuth client, not which agent runtime
+made a call. M1 specifically requires actual Pip and Muse to contribute and accept
+the same immutable revision/hash, with the exact recorded bindings matched to
+those agents. Observe separate host-side OAuth credential stores and calls;
+never copy/share one host's access or refresh tokens with the other. Separate
+client registrations and operator labels alone are insufficient. Approval is
+still required for provider configuration, client grants, credentials and real
+connections; this local change does none of those things.
+
+## Synthetic admission format 0.3
+
+**Documentation-only synthetic data; not real identities, clients, grants, tokens
+or configuration to deploy.** Replace nothing without the approved provider and
+actual host binding evidence. The sample expiry is an inert placeholder: runtime
+configuration requires a future expiry no more than seven days away. Both grants
+intentionally share a human owner while keeping agent clients separate.
+
+```json
+{
+  "synthetic-pip-grant-001": {
+    "issuer": "https://synthetic-issuer.invalid/",
+    "subject": "synthetic-shared-human-owner",
+    "client_id": "synthetic-pip-oauth-client",
+    "actor": "synthetic-pip",
+    "control_domain": "synthetic-pip-host",
+    "spaces": ["synthetic-pilot"],
+    "scopes": ["world:discover", "objects:read", "events:read"],
+    "expires_at": 0
+  },
+  "synthetic-muse-grant-001": {
+    "issuer": "https://synthetic-issuer.invalid/",
+    "subject": "synthetic-shared-human-owner",
+    "client_id": "synthetic-muse-oauth-client",
+    "actor": "synthetic-muse",
+    "control_domain": "synthetic-muse-host",
+    "spaces": ["synthetic-pilot"],
+    "scopes": ["world:discover", "objects:read", "events:read"],
+    "expires_at": 0
+  }
+}
+```
+
+The map key is the immutable `grant_id`. Each entry must match the fixed verified
+issuer, signed subject and signed `azp`; admission configuration is never an
+identity claim supplied by a tool. New grants/clients/scopes require approval.
+The sample read-only grants cannot write, send or accept anything. Real M1 write
+and acceptance scopes require explicit authorization, not a broad default.
+
+
+The binding registry is persisted, not merely checked within the currently active
+configuration: removing a grant does not release its actor or issuer/subject/client
+tuple for reassignment. A grant's issuer/subject/client/actor/control-domain binding
+is immutable. Reviewed scopes and expiry may change through configuration/restart.
+Existing actors without registry bindings fail closed and require a separately
+reviewed migration; never invent an identity mapping. The verifier freezes a
+detached admission snapshot; changing a caller's dictionary cannot mutate active
+authority. Only the `azp` profile is supported; alternative claim selectors fail.
+This 0.3 source revision is **local and not deployed** by this task.

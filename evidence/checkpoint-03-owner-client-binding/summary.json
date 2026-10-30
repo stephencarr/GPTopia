@@ -1,0 +1,27 @@
+{
+  "checkpoint": "0.3 shared human owner with independently bound agent clients/grants",
+  "base_commit": "ee4fd1f4bf66bf0f9b6c637a2e21310a94994bec",
+  "local_only": true,
+  "real_credentials_or_provider_changes": false,
+  "deployment_or_push": false,
+  "python_tests_passed": 87,
+  "mcp_tests_passed": 18,
+  "schema_validations_passed": 50,
+  "tests": "synthetic keys and local HTTP/ASGI only; no provider JWKS requests",
+  "claim_boundary": "RS256/signature/exact issuer/audience/lifetime/scopes unchanged; signed azp only; no client_id fallback",
+  "owner": "shared (issuer,subject) explicitly permitted",
+  "agent_binding": "immutable operator grant ID -> actor + issuer + subject + client_id + control_domain",
+  "acceptance": "distinct actor, issuer/client, grant and control_domain; exact revision/hash; no operational-independence claim",
+  "compatibility": "legacy nullable attribution cannot qualify; old acceptance retry receipts without matching attribution conflict; pre-existing unbound actor rejected",
+  "limitations": [
+    "azp authenticates OAuth client claim, not runtime possession/independence",
+    "M1 requires separate Pip/Muse OAuth stores and calls without token sharing",
+    "configuration/grant changes require reviewed restart; old actor/grant mapping is not reassigned"
+  ],
+  "sha256": {
+    "kernel.py": "eeee1b6bb7d8bf9e1713a887f2daaf4729ebfe2f13111c69e3a7881a54679743",
+    "identity.py": "60d821c664fe623ede2ad915865cd534b8f3789bd32dd01e1da07016d0e51556",
+    "production.py": "acbdab3ed60aa7115b84213b663fd124dcf340e2c40bc34e49d150ec09587350",
+    "mcp_adapter/worker.py": "7c696f9f398e77156d510e58a23893a994bc19ff85cdbab758746dd55be29def"
+  }
+}

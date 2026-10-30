@@ -55,3 +55,21 @@ rerun `python kernel.py init --db <path> --allow-insecure-test-identities` befor
 serving with 0.2. This additive initializer creates acceptance tables/triggers and
 preserves existing records; it is not a general migration framework or production
 admission process. Historical M0 evidence files are not rewritten.
+
+## 0.3 — shared human owner, separately bound agent grants
+
+Local revision; no provider, client, credential, permission or hosted change implied.
+Human owner `(issuer, subject)` may be shared. Agent attribution adds signed-`azp`
+client ID and immutable operator grant ID. Admissions are grant-keyed and bind
+issuer/subject/client to actor/control domain and bounded authority. Acceptance
+outputs retain legacy rows with null client/grant binding; those rows cannot
+qualify for attestation. New records require nonempty bindings. The generic
+predicate distinguishes actor, issuer/client, grant and control domain—not human
+subject. M1 still requires exact Pip/Muse records and observed separate host
+OAuth stores/calls without token sharing. Earlier checkpoint text/evidence above
+is historical, not the current identity predicate.
+
+Additional fail-closed compatibility: cached legacy acceptance receipts without
+matching client/grant attribution are rejected with conflict rather than replaying
+an old multi-party threshold. Production kernel calls also crosscheck the supplied
+principal against the immutable local grant registry. No legacy binding is invented.

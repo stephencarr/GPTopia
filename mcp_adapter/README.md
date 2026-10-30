@@ -53,8 +53,10 @@ Shares the production wrapper's operator-only variables:
 `GPTOPIA_RESOURCE`, `GPTOPIA_ISSUER`, `GPTOPIA_JWKS_URL`,
 `GPTOPIA_ADMISSIONS`, `GPTOPIA_DEADLINE`, `GPTOPIA_DB`.
 Resource must be an exact canonical HTTPS origin (no trailing slash/path).
-Admission validation runs before DB initialization. Each approved subject maps
-to its actor, control domain, client ID, spaces, scopes and bounded expiration.
+Admission validation runs before DB initialization. Admissions are keyed by immutable grant ID and bind exact issuer/subject/client
+to actor, control domain, spaces, scopes and bounded expiration. Client ID comes
+only from signature-validated Auth0-default-profile `azp`, with no `client_id`
+claim fallback. One human issuer/subject may own both separately admitted clients.
 No token issuance or login endpoint exists. An established provider must be
 selected/configured and the actual client/resource grants approved separately.
 
@@ -177,3 +179,44 @@ successful result). Non200 envelopes now permit only correlation ID and status;
 extra result/scope fields poison the worker. Independently, the MCP callback
 consumes a result only at status200. Two official-client regression tests cover
 both the real malformed child and a boundary double bypassing IPC validation.
+
+## Identity binding 0.3: one human owner, separate agent grants
+
+Stephen may authorize both Pip and Muse through the **same human owner** `(iss, sub)`.
+A second human account is neither required nor evidence of agent independence.
+The verifier derives `client_id` only from the signature-validated Auth0-default-profile
+`azp` claim—never an unvalidated request field and never a `client_id`-claim fallback.
+Operator admissions are keyed by immutable `grant_id` and bind exact
+`issuer`, `subject`, `client_id`, `actor`, `control_domain`, `spaces`, `scopes` and
+`expires_at`. The `(issuer, subject, client_id)` binding, actor and grant ID must
+be unique; the human `(issuer, subject)` can repeat. An existing grant ID must not
+be reassigned to a different binding. Revoke it; any replacement requires a newly
+approved binding and must not reuse an already registered actor or owner/client tuple.
+
+Each new acceptance records both `client_id` and `grant_id`. Migrated legacy
+records expose these fields as `null`; they remain historical evidence but
+cannot satisfy multi-party attestation. A qualifying pair has distinct actors,
+`(issuer, client_id)` pairs, grant IDs and control domains, with verified assurance.
+Distinct human subjects are **not** required. The generic flag still does not
+mean a designated pair agreed, a legal agreement exists, or independent runtime
+operation was proved.
+
+A signed `azp` identifies an authorized OAuth client, not which agent runtime
+made a call. M1 specifically requires actual Pip and Muse to contribute and accept
+the same immutable revision/hash, with the exact recorded bindings matched to
+those agents. Observe separate host-side OAuth credential stores and calls;
+never copy/share one host's access or refresh tokens with the other. Separate
+client registrations and operator labels alone are insufficient. Approval is
+still required for provider configuration, client grants, credentials and real
+connections; this local change does none of those things.
+
+
+The binding registry is persisted, not merely checked within the currently active
+configuration: removing a grant does not release its actor or issuer/subject/client
+tuple for reassignment. A grant's issuer/subject/client/actor/control-domain binding
+is immutable. Reviewed scopes and expiry may change through configuration/restart.
+Existing actors without registry bindings fail closed and require a separately
+reviewed migration; never invent an identity mapping. The verifier freezes a
+detached admission snapshot; changing a caller's dictionary cannot mutate active
+authority. Only the `azp` profile is supported; alternative claim selectors fail.
+This 0.3 source revision is **local and not deployed** by this task.

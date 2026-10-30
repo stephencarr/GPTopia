@@ -25,6 +25,8 @@ class Principal:
     expires_at: float
     revoked: bool = False
     assurance: str = 'synthetic'  # fixture | synthetic | verified (trusted adapter only)
+    client_id: str | None = None  # validated signed azp; NOT runtime attestation
+    grant_id: str | None = None  # immutable operator admission identity
 
 class AuthenticationError(Exception):
     pass
@@ -41,7 +43,7 @@ def validate(principal, op, space):
         raise AuthenticationError('identity audience mismatch')
     if (not isinstance(principal.assurance, str) or principal.assurance not in {'fixture', 'synthetic', 'verified'}
             or not all(isinstance(v, str) and 0 < len(v) <= 200 for v in
-                       [principal.actor, principal.issuer, principal.subject, principal.control_domain])):
+                       [principal.actor, principal.issuer, principal.subject, principal.control_domain, principal.client_id, principal.grant_id])):
         raise AuthenticationError('identity attribution missing or invalid')
     if any(not isinstance(values, frozenset) or any(not isinstance(v, str) or not 0 < len(v) <= 200 for v in values) for values in (principal.spaces, principal.scopes)):
         raise AuthenticationError('identity scope claims malformed')
@@ -54,4 +56,5 @@ def fixture(actor):
     """Insecure local assertion. Caller must explicitly enable fixture mode."""
     return Principal(actor, 'insecure-fixture', str(actor), str(actor),
                      frozenset({'plaza', 'garden', 'outside'}), frozenset(SCOPES.values()),
-                     AUDIENCE, time.time() + 60, assurance='fixture')
+                     AUDIENCE, time.time() + 60, assurance='fixture', client_id='fixture-client-' + str(actor),
+                     grant_id='fixture-grant-' + str(actor))

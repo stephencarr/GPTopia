@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS objects(id TEXT PRIMARY KEY, space TEXT NOT NULL, own
 CREATE TABLE IF NOT EXISTS versions(object_id TEXT NOT NULL, version INTEGER NOT NULL, author TEXT NOT NULL, content TEXT NOT NULL, readers TEXT NOT NULL, writers TEXT NOT NULL, created REAL NOT NULL, PRIMARY KEY(object_id,version));
 CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY, space TEXT NOT NULL, sender TEXT NOT NULL, recipient TEXT NOT NULL, content TEXT NOT NULL, created REAL NOT NULL);
 CREATE TABLE IF NOT EXISTS events(seq INTEGER PRIMARY KEY AUTOINCREMENT, space TEXT NOT NULL, kind TEXT NOT NULL, actor TEXT NOT NULL, subject TEXT NOT NULL, version INTEGER, audience TEXT NOT NULL, created REAL NOT NULL);
-CREATE TABLE IF NOT EXISTS acceptances(object_id TEXT NOT NULL, version INTEGER NOT NULL, content_sha256 TEXT NOT NULL, actor TEXT NOT NULL, issuer TEXT NOT NULL, subject TEXT NOT NULL, control_domain TEXT NOT NULL, assurance TEXT NOT NULL, created REAL NOT NULL, PRIMARY KEY(object_id,version,actor));
+CREATE TABLE IF NOT EXISTS acceptances(object_id TEXT NOT NULL, version INTEGER NOT NULL, content_sha256 TEXT NOT NULL, actor TEXT NOT NULL, issuer TEXT NOT NULL, subject TEXT NOT NULL, control_domain TEXT NOT NULL, assurance TEXT NOT NULL, created REAL NOT NULL, client_id TEXT, grant_id TEXT, PRIMARY KEY(object_id,version,actor));
 CREATE TRIGGER IF NOT EXISTS acceptance_no_update BEFORE UPDATE ON acceptances BEGIN SELECT RAISE(ABORT,'immutable acceptance'); END;
 CREATE TRIGGER IF NOT EXISTS acceptance_no_delete BEFORE DELETE ON acceptances BEGIN SELECT RAISE(ABORT,'immutable acceptance'); END;
 CREATE TABLE IF NOT EXISTS retries(actor TEXT NOT NULL, key TEXT NOT NULL, digest TEXT NOT NULL, response TEXT NOT NULL, PRIMARY KEY(actor,key));
@@ -60,6 +60,21 @@ CREATE TRIGGER IF NOT EXISTS events_no_delete BEFORE DELETE ON events BEGIN SELE
 CREATE TRIGGER IF NOT EXISTS audit_no_update BEFORE UPDATE ON audit BEGIN SELECT RAISE(ABORT,'append-only audit'); END;
 CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit BEGIN SELECT RAISE(ABORT,'append-only audit'); END;
 '''
+
+def initialize_schema(db):
+    """Add nullable attribution columns without inventing bindings for old records."""
+    db.executescript(SCHEMA)
+    db.execute('BEGIN IMMEDIATE')
+    try:
+        columns = {r[1] for r in db.execute('PRAGMA table_info(acceptances)')}
+        for field in ('client_id', 'grant_id'):
+            if field not in columns:
+                db.execute(f'ALTER TABLE acceptances ADD COLUMN {field} TEXT')
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
 
 class Kernel:
     def __init__(self, path, max_mutations=DEFAULT_MUTATIONS, max_objects=DEFAULT_OBJECTS, allow_fixture=False):
@@ -79,7 +94,7 @@ class Kernel:
 
     def initialize(self):
         with self.connection() as db:
-            db.executescript(SCHEMA)
+            initialize_schema(db)
             for actor, caps in [('alice', ['design']), ('bob', ['review']), ('eve', ['observe'])]:
                 db.execute('INSERT OR IGNORE INTO identities VALUES (?,?)', (actor, encode(caps)))
             for space, actor in [('plaza', 'alice'), ('plaza', 'bob'), ('garden', 'alice'), ('outside', 'eve')]:
@@ -143,6 +158,10 @@ class Kernel:
                 name(actor, 'actor')
                 if not db.execute('SELECT 1 FROM identities WHERE id=?', (actor,)).fetchone():
                     raise Fault('forbidden', 'identity not admitted')
+                if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='admission_bindings'").fetchone():
+                    binding = db.execute('SELECT actor,issuer,subject,client_id,control_domain FROM admission_bindings WHERE grant_id=?', (principal.grant_id,)).fetchone()
+                    if binding is None or tuple(binding) != (actor, principal.issuer, principal.subject, principal.client_id, principal.control_domain):
+                        raise Fault('unauthenticated', 'principal does not match immutable admission binding')
                 self.member(db, space, actor)
                 key = digest = None
                 if op in MUTATIONS:
@@ -158,6 +177,12 @@ class Kernel:
                         # Replays require current space membership, but return only the original
                         # mutation metadata (never object/message content), even after ACL revocation.
                         result = json.loads(prior['response'])
+                        if op == 'accept':
+                            records = result.get('result', {}).get('acceptance', {}).get('records', [])
+                            own = next((r for r in records if r.get('actor') == actor), None)
+                            fields = ('issuer', 'subject', 'client_id', 'grant_id', 'control_domain')
+                            if own is None or any(own.get(f) != getattr(principal, f) for f in fields):
+                                raise Fault('conflict', 'legacy or mismatched acceptance receipt cannot establish current agent attribution')
                         self.audit(db, actor, op, 'replay')
                         db.commit()
                         return result
@@ -194,7 +219,7 @@ class Kernel:
             raise Fault('invalid', 'unknown argument')
         if op == 'discover':
             return {'identities': [self.record(r) for r in db.execute('SELECT i.* FROM identities i JOIN members m ON i.id=m.actor WHERE m.space=? ORDER BY i.id', (space,))],
-                    'protocol': 'gptopia-kernel/0.2', 'limits': {'content_bytes': MAX_CONTENT, 'mutation_quota': self.max_mutations, 'objects_per_owner': self.max_objects},
+                    'protocol': 'gptopia-kernel/0.3', 'limits': {'content_bytes': MAX_CONTENT, 'mutation_quota': self.max_mutations, 'objects_per_owner': self.max_objects},
                     'operations': sorted(allowed)}
         if op in {'get', 'history', 'update', 'accept'}:
             row = self.obj(db, space, name(a.get('id'), 'id'), actor, op == 'update')
@@ -250,8 +275,8 @@ class Kernel:
             old = db.execute('SELECT * FROM acceptances WHERE object_id=? AND version=? AND actor=?', (row['id'], row['version'], actor)).fetchone()
             if old:
                 raise Fault('conflict', 'actor already accepted this revision; reuse the original retry key')
-            db.execute('INSERT INTO acceptances VALUES (?,?,?,?,?,?,?,?,?)',
-                       (row['id'], row['version'], digest, actor, principal.issuer, principal.subject, principal.control_domain, principal.assurance, time.time()))
+            db.execute('INSERT INTO acceptances(object_id,version,content_sha256,actor,issuer,subject,control_domain,assurance,created,client_id,grant_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+                       (row['id'], row['version'], digest, actor, principal.issuer, principal.subject, principal.control_domain, principal.assurance, time.time(), principal.client_id, principal.grant_id))
             seq = self.event(db, space, 'object.accepted', actor, row['id'], json.loads(row['readers']), row['version'])
             return {'id': row['id'], 'version': row['version'], 'content_sha256': digest, 'event': seq,
                     'acceptance': self.acceptance_status(db, row['id'], row['version'], digest)}
@@ -290,7 +315,10 @@ class Kernel:
     def acceptance_status(self, db, oid, version, digest):
         rows = [dict(r) for r in db.execute('SELECT * FROM acceptances WHERE object_id=? AND version=? AND content_sha256=? ORDER BY actor', (oid, version, digest))]
         def independent(items):
-            return any(a['actor'] != b['actor'] and (a['issuer'],a['subject']) != (b['issuer'],b['subject']) and a['control_domain'] != b['control_domain'] for a in items for b in items)
+            bound = [r for r in items if all(isinstance(r[k], str) and r[k] for k in ('client_id', 'grant_id'))]
+            return any(a['actor'] != b['actor'] and (a['issuer'], a['client_id']) != (b['issuer'], b['client_id'])
+                       and a['grant_id'] != b['grant_id'] and a['control_domain'] != b['control_domain']
+                       for a in bound for b in bound)
         verified = [r for r in rows if r['assurance'] == 'verified']
         return {'multi_party_attested': independent(verified), 'test_multi_party_attested': independent(rows) and not independent(verified),
                 'evidence_basis': 'claims_at_acceptance_time_not_live_revocation', 'records': rows}
@@ -310,7 +338,7 @@ class Server(ThreadingHTTPServer):
         super().__init__(address, Handler)
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = 'GPTopiaTestKernel/0.2'
+    server_version = 'GPTopiaTestKernel/0.3'
     def log_message(self, *args):
         pass
     def setup(self):

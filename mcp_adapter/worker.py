@@ -10,8 +10,8 @@ import time
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from identity import Principal
-from kernel import Kernel, SCHEMA, name
-from production import JWTVerifier, validate_admissions
+from kernel import Kernel, initialize_schema
+from production import JWTVerifier, validate_admissions, register_admissions
 
 
 class Boundary:
@@ -23,14 +23,10 @@ class Boundary:
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         self.kernel = Kernel(db_path, max_mutations=100, max_objects=10, allow_fixture=False)
         with self.kernel.connection() as db:
-            db.executescript(SCHEMA)
+            initialize_schema(db)
+            register_admissions(db, admissions)
             db.execute('CREATE TABLE IF NOT EXISTS request_budget (id INTEGER PRIMARY KEY CHECK(id=1), used INTEGER NOT NULL)')
             db.execute('INSERT OR IGNORE INTO request_budget VALUES (1,0)')
-            for grant in (admissions or {}).values():
-                actor = name(grant['actor'], 'actor')
-                db.execute('INSERT OR IGNORE INTO identities VALUES (?,?)', (actor, '[]'))
-                for space in grant['spaces']:
-                    db.execute('INSERT OR IGNORE INTO members VALUES (?,?)', (name(space, 'space'), actor))
             db.commit()
 
     def handle(self, message):

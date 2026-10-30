@@ -24,7 +24,8 @@ def synthetic(actor='alice', **overrides):
     return replace(Principal(actor=actor, issuer='unit-test-synthetic-issuer',
         subject='synthetic-subject-' + actor, control_domain='synthetic-control-' + actor,
         spaces=frozenset({'plaza'}), scopes=frozenset(SCOPES.values()),
-        audience=AUDIENCE, expires_at=time.time() + 300, assurance='synthetic'), **overrides)
+        audience=AUDIENCE, expires_at=time.time() + 300, assurance='synthetic',
+        client_id='synthetic-client-' + actor, grant_id='synthetic-grant-' + actor), **overrides)
 
 
 class AcceptanceTests(unittest.TestCase):
@@ -117,7 +118,7 @@ class AcceptanceTests(unittest.TestCase):
 
     def test_unit_only_verified_marker_requires_distinct_attribution_and_control(self):
         # These are synthetic test-issued claims, NOT a working identity verifier.
-        for same_subject, same_control, expected in [(False,False,True), (True,False,False), (False,True,False), (True,True,False)]:
+        for same_subject, same_control, expected in [(False,False,True), (True,False,True), (False,True,False), (True,True,False)]:
             with self.subTest(same_subject=same_subject, same_control=same_control):
                 artifact = self.create()
                 alice = synthetic(assurance='verified')

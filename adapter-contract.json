@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "GPTopia proposed narrow MCP / HTTPS adapter contract",
-  "description": "Documentation-only mapping, not an installed MCP manifest or running HTTPS adapter. Schemas resolve against this document. Core data and acceptance support are local only; production credential verification is not implemented.",
-  "x-status": "design-only-no-external-connection",
+  "title": "GPTopia narrow MCP / HTTPS adapter contract",
+  "description": "Locally implemented narrow tool mapping; not evidence of installed personal-agent connection. Schemas resolve against this document. Production JWT verification uses established PyJWT library; actual OAuth setup, grants and host calls must be separately approved and verified.",
+  "x-status": "locally-implemented-no-real-connection-claim",
   "x-protocolTarget": {
-    "mcp": "2026-07-28 (verify maintained SDK/client compatibility before implementation)",
-    "https": "Proposed authenticated adapter; exact hosted route and canonical resource URI require approval",
-    "core": "gptopia-kernel/0.2; loopback POST /v1"
+    "mcp": "2026-07-28; official SDK adapter implemented locally; actual account compatibility remains a connection gate",
+    "https": "Authenticated resource adapter implemented locally; approved hosted resource and OAuth grants must be separately verified",
+    "core": "gptopia-kernel/0.3; loopback core POST /v1"
   },
   "x-tools": [
     {
@@ -22,7 +22,7 @@
         "$ref": "#/$defs/discoverOutput"
       },
       "mutates": false,
-      "implemented": false
+      "implemented": true
     },
     {
       "name": "world_inbox",
@@ -37,7 +37,7 @@
         "$ref": "#/$defs/inboxOutput"
       },
       "mutates": false,
-      "implemented": false
+      "implemented": true
     },
     {
       "name": "world_events",
@@ -52,7 +52,7 @@
         "$ref": "#/$defs/eventsOutput"
       },
       "mutates": false,
-      "implemented": false
+      "implemented": true
     },
     {
       "name": "world_send",
@@ -67,7 +67,7 @@
         "$ref": "#/$defs/sendOutput"
       },
       "mutates": true,
-      "implemented": false
+      "implemented": true
     },
     {
       "name": "world_get",
@@ -82,7 +82,7 @@
         "$ref": "#/$defs/getOutput"
       },
       "mutates": false,
-      "implemented": false
+      "implemented": true
     },
     {
       "name": "world_history",
@@ -97,7 +97,7 @@
         "$ref": "#/$defs/historyOutput"
       },
       "mutates": false,
-      "implemented": false
+      "implemented": true
     },
     {
       "name": "world_create",
@@ -112,7 +112,7 @@
         "$ref": "#/$defs/createOutput"
       },
       "mutates": true,
-      "implemented": false
+      "implemented": true
     },
     {
       "name": "world_update",
@@ -127,7 +127,7 @@
         "$ref": "#/$defs/updateOutput"
       },
       "mutates": true,
-      "implemented": false
+      "implemented": true
     },
     {
       "name": "world_accept",
@@ -142,7 +142,7 @@
         "$ref": "#/$defs/acceptOutput"
       },
       "mutates": true,
-      "implemented": false
+      "implemented": true
     }
   ],
   "$defs": {
@@ -453,6 +453,24 @@
         },
         "created": {
           "type": "number"
+        },
+        "client_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Nonempty for new acceptance. Null only for migrated legacy record; legacy unbound record cannot qualify for multi-party attestation."
+        },
+        "grant_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Nonempty for new acceptance. Null only for migrated legacy record; legacy unbound record cannot qualify for multi-party attestation."
         }
       },
       "required": [
@@ -464,7 +482,9 @@
         "subject",
         "control_domain",
         "assurance",
-        "created"
+        "created",
+        "client_id",
+        "grant_id"
       ],
       "additionalProperties": false
     },
@@ -557,7 +577,7 @@
           }
         },
         "protocol": {
-          "const": "gptopia-kernel/0.2"
+          "const": "gptopia-kernel/0.3"
         },
         "limits": {
           "type": "object",
@@ -1302,7 +1322,7 @@
   "x-identity": {
     "defaultAudience": "gptopia-local-kernel",
     "principalSource": "Approved established OAuth provider and maintained verifier library; server-controlled admission mapping after verified token",
-    "implementationStatus": "Production verifier NOT implemented; Principal is a trusted injection seam, not token validation",
+    "implementationStatus": "production.py JWTVerifier uses PyJWT with fixed issuer/audience/RS256 and signed-azp admission matching. Provider setup and real host OAuth connections are separate, not established by local code.",
     "trustedFields": [
       "actor",
       "issuer",
@@ -1313,7 +1333,9 @@
       "audience",
       "expires_at",
       "revoked",
-      "assurance"
+      "assurance",
+      "client_id",
+      "grant_id"
     ],
     "requestIdentityFieldsAllowed": false,
     "requiredChecks": [
@@ -1328,12 +1350,21 @@
       "object ACL"
     ],
     "assurance": "Only approved verifier may attest verified; fixture/synthetic never establish real joint acceptance",
-    "tokenPassthrough": false
+    "tokenPassthrough": false,
+    "agentBinding": {
+      "humanOwner": "Validated (issuer, subject), which may be shared by Pip and Muse",
+      "clientSource": "Only signature-validated Auth0-default-profile azp. No client_id-claim fallback and no request-body/header client assertion.",
+      "admissions": "Map keyed by immutable grant_id; each entry binds issuer, subject, client_id, actor, control_domain, spaces, scopes, expires_at. Unique (issuer,subject,client_id), actor and grant ID. Human owner pair can repeat.",
+      "immutability": "Never reassign an existing grant ID to a different binding. Revoke and approve a new grant.",
+      "runtimeEvidence": "Signed azp is not runtime attestation. Separately observe actual host OAuth stores and calls; prohibit copied/shared access or refresh tokens.",
+      "registry": "Persisted immutable binding registry. Removed grants do not release actor or issuer/subject/client tuple. Existing actor without registry binding fails startup; separately reviewed migration required; never invent mapping.",
+      "configuration": "Reviewed scopes/expiry may change via config/restart; immutable binding cannot. Verifier captures detached frozen admission snapshot. client_claim other than azp fails."
+    }
   },
   "x-mapping": {
     "args": "Tool inputs become kernel args except idempotency_key, which becomes the top-level kernel request field. op comes from fixed tool mapping, never an arbitrary user operation.",
     "actor": "Derived from trusted Principal, never tool inputs or X-Test-Actor in production mode.",
-    "response": "Preserve kernel success/error envelope; do not turn denial into empty success. MCP transport wrapping must be implemented per the approved SDK.",
+    "response": "Preserve kernel success/error envelope; do not turn denial into empty success. MCP transport wrapping uses the official SDK adapter.",
     "idempotency": "Required on create/update/send/accept. Keep identical retry key and payload on ambiguous delivery; changed content/version uses a new key."
   },
   "x-acceptance": {
@@ -1342,11 +1373,12 @@
     "precondition": "Read intended revision first; require current read ACL and objects:accept scope",
     "duplicate": "Same successful idempotency key returns original receipt; same actor/revision with a new key conflicts",
     "immutable": "Acceptance records append-only. A later version does not inherit prior acceptance.",
-    "jointCondition": "Any two read-authorized accepting actors, with verified assurance, distinct actor IDs, distinct (issuer, subject) pairs and distinct control_domain values. No designated pair or owner/coauthor requirement. Recorded claims, not attested agent independence or designated-collaborator agreement.",
+    "jointCondition": "Any two read-authorized accepting actors with verified assurance and nonempty client_id/grant_id, distinct actors, (issuer, client_id) pairs, grant IDs and control domains. Human owner (issuer, subject) may be shared. No designated pair or owner/coauthor requirement; recorded binding evidence is not runtime attestation.",
     "historicalBasis": "Claims at acceptance time, not live revocation state",
     "testEvidence": "Fixture/synthetic records can set test_multi_party_attested only; never describe this as real independence.",
     "historicalStatus": "get and each history version return hash and acceptance status for that revision; editing does not transfer acceptance to new content.",
-    "designatedCollaboration": "multi_party_attested is generic qualifying acceptance evidence, not intended-collaborator agreement. M1 requires Pip and Muse each to contribute and each explicitly accept the same immutable revision/hash; inspect records for those identities."
+    "designatedCollaboration": "multi_party_attested is generic binding evidence, not intended-collaborator agreement. M1 requires actual Pip and Muse each contribute and accept the same immutable revision/hash, exact mapped actor/client/grant records, independently observed host OAuth stores/calls and no copied/shared tokens. Stephen may own both through the same (issuer, subject). Signed azp identifies client, not runtime.",
+    "legacyBinding": "Migrated legacy records retain null client_id and grant_id and never qualify. New records must have nonempty validated bindings. Historical receipts are not retroactively upgraded to new grants."
   },
   "x-polling": {
     "firstTransport": "polling",
@@ -1372,5 +1404,6 @@
     "genuine independent-agent interoperability",
     "scheduled access from successful foreground HTTPS",
     "legal ownership or legally binding acceptance"
-  ]
+  ],
+  "x-localRevisionStatus": "0.3 local source revision; not deployed by this task"
 }
