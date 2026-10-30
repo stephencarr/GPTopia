@@ -72,15 +72,15 @@ class AcceptanceTests(unittest.TestCase):
                           *[synthetic(revoked=v) for v in [None, 0, '', [], {}]],
                           synthetic(assurance='self-asserted'), synthetic(scopes=None), synthetic(spaces=None)]:
             with self.subTest(principal=principal):
-                self.error(self.call('discover', principal=principal), 'unauthenticated')
+                self.error(self.call('discover', principal=principal), 'forbidden' if principal.scopes == frozenset() or principal.spaces == frozenset({'garden'}) else 'unauthenticated')
 
     def test_operation_scope_is_not_interchangeable(self):
         read_only = synthetic(scopes=frozenset({'world:discover', 'objects:read'}))
         self.ok(self.call('discover', principal=read_only))
-        self.error(self.call('send', principal=read_only, recipient='bob', content='x'), 'unauthenticated')
+        self.error(self.call('send', principal=read_only, recipient='bob', content='x'), 'forbidden')
         artifact = self.create()
         self.ok(self.call('get', principal=read_only, id=artifact['id']))
-        self.error(self.accept(artifact, principal=read_only), 'unauthenticated')
+        self.error(self.accept(artifact, principal=read_only), 'forbidden')
 
     def test_json_sender_spoof_cannot_override_trusted_principal(self):
         self.error(self.call('send', principal=synthetic('bob'), recipient='alice', content='x', sender='alice'), 'invalid')
@@ -174,7 +174,7 @@ class AcceptanceTests(unittest.TestCase):
     def test_acceptance_authorization_and_quota(self):
         artifact = self.ok(self.call('create', content='private', readers=['alice'], writers=['alice']))
         self.error(self.accept(artifact, synthetic('bob')), 'not_found')
-        self.error(self.call('accept', id=artifact['id'], version=1, content_sha256=artifact['content_sha256'], space='garden'), 'unauthenticated')
+        self.error(self.call('accept', id=artifact['id'], version=1, content_sha256=artifact['content_sha256'], space='garden'), 'forbidden')
         self.kernel = Kernel(self.path, max_mutations=1)
         self.error(self.accept(artifact), 'quota')
         with sqlite3.connect(self.path) as db:
@@ -257,8 +257,8 @@ class SyntheticVerifierHTTPTests(unittest.TestCase):
         for case in [None, 'unrecognized', 'expired', 'revoked', 'audience', 'scope', 'none', 'invalid-type', 'crash']:
             with self.subTest(case=case):
                 status, body = self.rpc({'X-Synthetic-Case':case} if case else {})
-                self.assertEqual(status, 401, body)
-                self.assertEqual(body['error']['code'], 'unauthenticated')
+                self.assertEqual(status, 403 if case == 'scope' else 401, body)
+                self.assertEqual(body['error']['code'], 'forbidden' if case == 'scope' else 'unauthenticated')
                 self.assertNotIn('secret detail', json.dumps(body))
         self.assertEqual(self.rpc({'X-Synthetic-Case':'valid'})[0], 200)
         self.assertEqual(self.rpc({'X-Synthetic-Case':'valid','X-Test-Actor':'bob'})[0], 401)

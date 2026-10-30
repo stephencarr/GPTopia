@@ -47,7 +47,7 @@ class ProductionTests(unittest.TestCase):
             self.assertEqual(c.post('/v1',headers=h|{'X-Test-Actor':'bob'},json={}).status_code,401)
             self.assertEqual(c.post('/v1',headers=h|{'Origin':'https://world.example'},json={}).status_code,401)
             self.assertEqual(c.post('/v1',headers=h,json={'op':'discover','actor':'bob','args':{'space':'pilot'}}).status_code,400)
-            self.assertEqual(c.post('/v1',headers=h,json={'op':'discover','args':{'space':'other'}}).status_code,401)
+            self.assertEqual(c.post('/v1',headers=h,json={'op':'discover','args':{'space':'other'}}).status_code,403)
             self.assertEqual(c.post('/v1',headers=h|{'Content-Type':'application/json'},content='x'*32769).status_code,413)
     def test_no_fixture_admission(self):
         with self.client() as c:

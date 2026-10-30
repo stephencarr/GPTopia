@@ -1,0 +1,1 @@
+PASS: 122 validations across actual requests, tool inputs and kernel response envelopes; all 20 operations, acceptance history, error401 payload, both schemas checked.

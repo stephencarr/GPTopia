@@ -1,0 +1,13 @@
+Independent read-only review of local 0.4 candidate, 2026-10-30 UTC
+
+Reviewer independently passed 104 Python tests,33 Node tests and122 actual schema
+checks, plus adversarial cached-acceptance replay after rejoin/regrant and actual
+SQLite page-growth rollback. An implicit epoch regrant through content-only edits
+was found and fixed; explicit owner ACL revision is now required. Object event
+audiences use the same revision grants. Docker packaging omission was fixed.
+Rollback documentation now warns against running 0.3 on a migrated database.
+
+The implementer subsequently added a permanent real SQLite-growth regression,
+retested copied-database HTTP process restart twice, and reran105 Python tests.
+No production security certification, container validation or independent-agent
+milestone is claimed. Actual image build and real Pip/Muse0.4 flow are still gates.

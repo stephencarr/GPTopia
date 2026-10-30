@@ -1,0 +1,40 @@
+{
+  "candidate": "Kernel0.4 local isolated worktree",
+  "base_commit": "0e631e6a410a8918919eef66579f943adc3fde4a",
+  "adapter_commit": "477ca4894bb261b7cbba69dd0f66e6f023a9a56d",
+  "live_checkout_unchanged": true,
+  "tests": {
+    "python": 105,
+    "node_mcp": 33,
+    "actual_schema_validations": 122,
+    "copied_03_database_migration_and_two_http_restarts": true,
+    "packaged_python_imports": true,
+    "container_image_build": "not attempted: Docker and Podman not found on PATH"
+  },
+  "new_operations": 11,
+  "total_operations": 20,
+  "limits": {
+    "children_per_root": 10,
+    "members_and_pending_invitees_per_child": 10,
+    "content_utf8_bytes": 8192,
+    "page_results": 100,
+    "rows_scanned": 500,
+    "audit_records": 20000,
+    "database_page_bytes": 33554432
+  },
+  "authority": "new spaces:write exists in candidate only; no live grant enabled",
+  "external_changes": false,
+  "real_independent_agent_demonstration": false,
+  "remaining_gates": [
+    "approved isolated image build/runtime budget validation",
+    "approved staged backup/migration/promotion; no blind binary rollback",
+    "actual separate Pip/Muse host connections and permitted operations"
+  ],
+  "source_sha256": {
+    "kernel.py": "93837e1bd7efa52138a561155d35a688020171bf2cfe62ccf1c861e08fce9051",
+    "world04.py": "ae1d3ea484aafb0517c49d340a626a2c85cf76ff0926b309819918d2dd50d051",
+    "identity.py": "26876dee660aaee535d1c0364335372047cd0fead3929eb4ce62b0367d396c18",
+    "production.py": "17574422eadc8e0c319a1931bd52932e0f512a246a73613fec972b640574f6d6",
+    "mcp_adapter/server.mjs": "6827955d258e4772ab503d4a0a3aa3b8b77207f913abfa6904ccf4889e837f5b"
+  }
+}

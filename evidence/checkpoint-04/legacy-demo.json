@@ -1,0 +1,51 @@
+{
+  "milestone": "deterministic two-process protocol proof; NOT real-agent interoperability",
+  "clients": [
+    {
+      "process": 122,
+      "role": "alice",
+      "object": "obj_7101e9ac5a1c46818830138a64eec48d",
+      "version": 1
+    },
+    {
+      "process": 126,
+      "role": "bob",
+      "object": "obj_7101e9ac5a1c46818830138a64eec48d",
+      "version": 2,
+      "idempotent_retry": true
+    }
+  ],
+  "persisted_after_server_restart": true,
+  "events": 4,
+  "history_authors": [
+    "alice",
+    "bob"
+  ],
+  "database": "/tmp/gptopia-demo-ui13nrsd/world.sqlite3",
+  "shared_artifact": {
+    "acceptance": {
+      "evidence_basis": "claims_at_acceptance_time_not_live_revocation",
+      "multi_party_attested": false,
+      "records": [],
+      "test_multi_party_attested": false
+    },
+    "author": "bob",
+    "content": "# City charter\nAlice: build a public garden.\nBob: add a shared seed library.",
+    "content_sha256": "ff520e4f5614c3bc4dd2b5c53663dd6c0c04597852997703f8669ed8b79b2724",
+    "created": 1793390298.5443578,
+    "id": "obj_7101e9ac5a1c46818830138a64eec48d",
+    "owner": "alice",
+    "readers": [
+      "alice",
+      "bob"
+    ],
+    "space": "plaza",
+    "tags": [],
+    "title": "",
+    "version": 2,
+    "writers": [
+      "alice",
+      "bob"
+    ]
+  }
+}

@@ -1,0 +1,71 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> test
+> node --test test.mjs test_faults.mjs test_protocols.mjs
+
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ modern official SDK discovery, nine schema-validated tools, real JWT + durable kernel (1453.463461ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ production worker fails closed without credentials (196.424475ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ production hostname gate, Railway health probe, and unconfigured public staging (179.047891ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ advertised scopes are validated metadata hints, never authentication grants (946.240455ms)
+✔ invalid advertised-scope environment exits before serving or spawning a worker (1792.845645ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ 0.4 2026-07-28: scope-filtered discovery, roots bootstrap and precise space denial (379.633583ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ 0.4 2025-11-25: scope-filtered discovery, roots bootstrap and precise space denial (609.966928ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ 0.4 2025-06-18: scope-filtered discovery, roots bootstrap and precise space denial (359.432366ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ 0.4 2025-03-26: scope-filtered discovery, roots bootstrap and precise space denial (512.95408ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ 0.4 2026-07-28: all new tools strict schemas; old object shapes remain valid (680.651512ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ 0.4 2025-11-25: all new tools strict schemas; old object shapes remain valid (589.041321ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ 0.4 2025-06-18: all new tools strict schemas; old object shapes remain valid (407.480557ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ 0.4 2025-03-26: all new tools strict schemas; old object shapes remain valid (512.086523ms)
+✔ worker exit: all pending calls fail closed and timers clear (114.557087ms)
+✔ worker stall: all pending calls fail closed and timers clear (1506.970317ms)
+✔ worker malformed: all pending calls fail closed and timers clear (97.981855ms)
+✔ worker wrong-id: all pending calls fail closed and timers clear (85.518422ms)
+✔ worker partial: all pending calls fail closed and timers clear (104.62977ms)
+✔ worker oversize: all pending calls fail closed and timers clear (165.409103ms)
+✔ malformed successful authentication response is not trusted (98.831416ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ eight-request queue rejects excess without response misrouting (288.750529ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ HTTP health and protected requests never succeed after worker exit (129.423337ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ HTTP health and protected requests never succeed after worker stall (1531.565064ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ HTTP health and protected requests never succeed after worker malformed (139.319192ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ shutdown immediately settles requests and reaps SIGTERM-ignoring child (12.032993ms)
+✔ spawn failure settles pending work without waiting for an exit event (4.587894ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ contradictory unavailable/success envelope denied by worker layer (336.970893ms)
+✔ contradictory unavailable/success envelope denied by handler layer (10.261961ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ official legacy client 2025-11-25: exact negotiation, all nine tools and unchanged authorization (1298.271093ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ official legacy client 2025-06-18: exact negotiation, all nine tools and unchanged authorization (574.397557ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ official legacy client 2025-03-26: exact negotiation, all nine tools and unchanged authorization (706.79861ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ raw Muse-shaped requests negotiate statelessly; unsupported versions cannot execute (529.379139ms)
+responseMode: 'json' drops mid-call notifications. subscriptions/listen streams are always served over SSE regardless; other notifications emitted before a result are dropped.
+✔ modern and legacy clients share durable state without sharing transport identity (424.897781ms)
+ℹ tests 33
+ℹ suites 0
+ℹ pass 33
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 9475.611831

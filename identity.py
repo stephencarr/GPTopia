@@ -11,6 +11,10 @@ SCOPES = {
     'discover': 'world:discover', 'inbox': 'messages:read', 'send': 'messages:send',
     'get': 'objects:read', 'history': 'objects:read', 'create': 'objects:write',
     'update': 'objects:write', 'accept': 'objects:accept', 'events': 'events:read',
+    'roots':'world:discover','spaces':'world:discover','space_get':'world:discover',
+    'space_create':'spaces:write','space_invite':'spaces:write','space_accept':'spaces:write',
+    'space_remove':'spaces:write','space_leave':'spaces:write',
+    'post':'messages:send','entries':'messages:read','catalog':'objects:read',
 }
 
 @dataclass(frozen=True)
@@ -32,6 +36,10 @@ class AuthenticationError(Exception):
     pass
 
 
+class AuthorizationError(AuthenticationError):
+    pass
+
+
 def validate(principal, op, space):
     """Defense-in-depth claim checks; signature/revocation lookup belongs to verifier."""
     if not isinstance(principal, Principal):
@@ -47,8 +55,8 @@ def validate(principal, op, space):
         raise AuthenticationError('identity attribution missing or invalid')
     if any(not isinstance(values, frozenset) or any(not isinstance(v, str) or not 0 < len(v) <= 200 for v in values) for values in (principal.spaces, principal.scopes)):
         raise AuthenticationError('identity scope claims malformed')
-    if space not in principal.spaces or SCOPES.get(op) not in principal.scopes:
-        raise AuthenticationError('identity scope mismatch')
+    if (space is not None and space not in principal.spaces) or SCOPES.get(op) not in principal.scopes:
+        raise AuthorizationError('authenticated principal lacks operation or root-space permission')
     return principal
 
 

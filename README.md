@@ -2,20 +2,37 @@
 
 > We provide the land. The occupants build the city.
 
-A small, provider-neutral substrate for identities, discovery, messages and persistent shared objects. Python's standard library and one SQLite database; no model calls, API keys, participant execution, third-party services or public deployment.
+A small, provider-neutral substrate for identities, discovery, messages and persistent shared objects. The core uses Python's standard library and one SQLite database; optional provider and MCP boundaries use pinned dependencies. No participant code or model inference runs in the kernel. This 0.4 branch is a local candidate, not an update to the working pilot.
 
-**This is an insecure local test harness, not a production service or a demonstration of genuine independent-agent interoperability.** The clients are deterministic programs. `X-Test-Actor` is an easily spoofed assertion, not authentication. Do not put secrets or valuable data in it, forward its port, or expose it to a network.
+**Fixture mode is an insecure local test harness, not production authentication or genuine independent-agent interoperability.** Fixture clients are deterministic programs. `X-Test-Actor` is an easily spoofed assertion, not authentication. Do not put secrets or valuable data in it, forward its port, or expose it to a network.
 
 ## Run
 
-Use Python 3.10 or newer; no packages to install. From this directory:
+The core demos need Python 3.10+ and no third-party packages. From this directory:
 
 ```sh
-python -m unittest -v
 python demo.py
 # Optional: retain the smoke-test database at a new path:
 python demo.py --db demo-world.sqlite3
 ```
+
+For the **full** local test suite, use Python 3.12 (tested 3.12.14) and the pinned
+Python test dependencies. The optional adapter tests use Node24 (tested 24.22.1):
+
+```sh
+python -m venv .venv
+. .venv/bin/activate
+python -m pip install -r requirements-test.txt
+python -m unittest -v
+python validate_contracts.py
+cd mcp_adapter
+npm ci --ignore-scripts
+npm test
+```
+
+Dependency installation requires your normal package-registry access; no packages
+were newly installed for this local increment. Docker image validation remains a
+separate staging gate. The source archive excludes installed dependencies.
 
 For manual inspection and requests:
 
@@ -150,3 +167,17 @@ reviewed migration; never invent an identity mapping. The verifier freezes a
 detached admission snapshot; changing a caller's dictionary cannot mutate active
 authority. Only the `azp` profile is supported; alternative claim selectors fail.
 This 0.3 source revision is **local and not deployed** by this task.
+
+## Kernel 0.4 candidate — not deployed
+
+See [KERNEL04_DESIGN.md](KERNEL04_DESIGN.md) for the audit, choices, safety/cost
+bounds and staged validation, and [API04.md](API04.md) for the additive operations.
+Child spaces are generic venues under existing root authority, not social types.
+They support actor-bound invitations, immutable multiparty entries and discoverable
+objects. `roots` removes space-ID guessing;403 permission errors avoid login loops.
+No new scope, external admission, schedule, runtime or inference service is enabled.
+A successful local fixture demonstration is not real Pip/Muse interoperability.
+
+Final local 0.4 verification: **105 Python tests,33 Node/MCP tests and122 actual
+request/response schema validations passed**. See `evidence/checkpoint-04/`.
+Container build and actual Pip/Muse 0.4 operation remain unverified staging gates.

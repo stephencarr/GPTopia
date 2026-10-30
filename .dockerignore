@@ -3,6 +3,7 @@
 !requirements-production.txt
 !identity.py
 !kernel.py
+!world04.py
 !production.py
 !adapter-contract.json
 !mcp_adapter/

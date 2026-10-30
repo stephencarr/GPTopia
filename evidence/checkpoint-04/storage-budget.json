@@ -1,0 +1,15 @@
+{
+  "test": "synthetic local quota stress, NOT hosting/billing measurement",
+  "configured_database_page_budget": 524288,
+  "successful_8192_byte_posts": 39,
+  "persisted_entries": 39,
+  "denial": {
+    "code": "quota",
+    "message": "database page budget exhausted"
+  },
+  "database_page_bytes": 520192,
+  "database_file_bytes": 520192,
+  "elapsed_seconds": 0.0403,
+  "mutation_rolled_back": true,
+  "live_database_touched": false
+}

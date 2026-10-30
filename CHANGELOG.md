@@ -73,3 +73,14 @@ Additional fail-closed compatibility: cached legacy acceptance receipts without
 matching client/grant attribution are rejected with conflict rather than replaying
 an old multi-party threshold. Production kernel calls also crosscheck the supplied
 principal against the immutable local grant registry. No legacy binding is invented.
+
+## 0.4 — local child venues and discoverable shared content
+
+Isolated candidate branch; working pilot and grants unchanged. Adds root discovery,
+owner-managed bounded child membership, actor-bound invitations, immutable shared
+entries, ACL/epoch-filtered catalog and title/tags metadata. Existing objects,
+acceptance, private mail and event polling are reused. Membership epochs and
+explicit owner ACL renewal prevent history/permission resurrection after rejoin.
+Read authorization failures are403; authentication failures remain401. Bounded
+scans/audit/storage guards fail closed without deletion. See KERNEL04_DESIGN.md
+and API04.md for limits, evidence gates and the nontrivial binary rollback caveat.

@@ -1,0 +1,71 @@
+{
+  "checkpoint": "synthetic verified-principal seam and same-revision acceptance; NOT M1",
+  "same_revision_test_accepted": {
+    "id": "obj_5833b74dae064e8e92bda9891792bc3e",
+    "version": 1,
+    "content_sha256": "b51c8a0db195b86b09c3ba4acc432d945592149eed31a2ae295adc65ccb594bf",
+    "event": 3,
+    "acceptance": {
+      "multi_party_attested": false,
+      "test_multi_party_attested": true,
+      "evidence_basis": "claims_at_acceptance_time_not_live_revocation",
+      "records": [
+        {
+          "object_id": "obj_5833b74dae064e8e92bda9891792bc3e",
+          "version": 1,
+          "content_sha256": "b51c8a0db195b86b09c3ba4acc432d945592149eed31a2ae295adc65ccb594bf",
+          "actor": "alice",
+          "issuer": "synthetic-demo",
+          "subject": "alice",
+          "control_domain": "test-control-alice",
+          "assurance": "synthetic",
+          "created": 1793390298.792981,
+          "client_id": "test-client-alice",
+          "grant_id": "test-grant-alice"
+        },
+        {
+          "object_id": "obj_5833b74dae064e8e92bda9891792bc3e",
+          "version": 1,
+          "content_sha256": "b51c8a0db195b86b09c3ba4acc432d945592149eed31a2ae295adc65ccb594bf",
+          "actor": "bob",
+          "issuer": "synthetic-demo",
+          "subject": "bob",
+          "control_domain": "test-control-bob",
+          "assurance": "synthetic",
+          "created": 1793390298.7941875,
+          "client_id": "test-client-bob",
+          "grant_id": "test-grant-bob"
+        }
+      ]
+    }
+  },
+  "after_edit": {
+    "id": "obj_5833b74dae064e8e92bda9891792bc3e",
+    "space": "plaza",
+    "owner": "alice",
+    "version": 2,
+    "content": "Revised design requires new acceptance.",
+    "readers": [
+      "alice",
+      "bob"
+    ],
+    "writers": [
+      "alice",
+      "bob"
+    ],
+    "title": "",
+    "tags": [],
+    "author": "bob",
+    "created": 1793390298.7951531,
+    "content_sha256": "631fd0c882c3de6291329faf54de23484d78bca4f0e1e753714ea3e7103d70e4",
+    "acceptance": {
+      "multi_party_attested": false,
+      "test_multi_party_attested": false,
+      "evidence_basis": "claims_at_acceptance_time_not_live_revocation",
+      "records": []
+    }
+  },
+  "historical_acceptance_preserved": true,
+  "real_verifier_configured": false,
+  "external_connections": false
+}

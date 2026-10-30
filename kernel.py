@@ -10,14 +10,15 @@ import uuid
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from identity import Principal, AuthenticationError, fixture, validate
+from identity import Principal, AuthenticationError, AuthorizationError, SCOPES, fixture, validate
+from world04 import World, OPS, WRITES, SCAN, SCHEMA as WORLD_SCHEMA, metadata
 
 MAX_BODY = 32768
 MAX_CONTENT = 8192
 DEFAULT_MUTATIONS = 1000
 DEFAULT_OBJECTS = 100
 IDENT = re.compile(r'^[a-zA-Z0-9_.:-]{1,80}$')
-MUTATIONS = {'create', 'update', 'send', 'accept'}
+MUTATIONS = {'create', 'update', 'send', 'accept'} | WRITES
 
 class Fault(Exception):
     def __init__(self, code, message):
@@ -63,13 +64,18 @@ CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit BEGIN SELECT
 
 def initialize_schema(db):
     """Add nullable attribution columns without inventing bindings for old records."""
-    db.executescript(SCHEMA)
+    db.executescript(SCHEMA + WORLD_SCHEMA)
     db.execute('BEGIN IMMEDIATE')
     try:
         columns = {r[1] for r in db.execute('PRAGMA table_info(acceptances)')}
         for field in ('client_id', 'grant_id'):
             if field not in columns:
                 db.execute(f'ALTER TABLE acceptances ADD COLUMN {field} TEXT')
+        for table in ('objects', 'versions'):
+            columns = {r[1] for r in db.execute(f'PRAGMA table_info({table})')}
+            for field, default in [('title', ''), ('tags', '[]')]:
+                if field not in columns:
+                    db.execute(f"ALTER TABLE {table} ADD COLUMN {field} TEXT NOT NULL DEFAULT '{default}'")
         db.commit()
     except Exception:
         db.rollback()
@@ -77,9 +83,11 @@ def initialize_schema(db):
 
 
 class Kernel:
-    def __init__(self, path, max_mutations=DEFAULT_MUTATIONS, max_objects=DEFAULT_OBJECTS, allow_fixture=False):
+    def __init__(self, path, max_mutations=DEFAULT_MUTATIONS, max_objects=DEFAULT_OBJECTS, allow_fixture=False, max_audit=20000, max_database_bytes=32*1024*1024):
         self.path = str(path)
         self.allow_fixture = allow_fixture
+        self.world = World(self)
+        self.max_audit, self.max_database_bytes = max_audit, max_database_bytes
         self.max_mutations, self.max_objects = max_mutations, max_objects
 
     @contextmanager
@@ -102,12 +110,18 @@ class Kernel:
             db.commit()
 
     def member(self, db, space, actor):
+        child = self.world.child(db, space)
+        if child:
+            self.member(db, child['root'], actor)
+            if not self.world.epoch(db, space, actor):
+                raise Fault('forbidden', 'current child membership required')
+            return
         if not db.execute('SELECT 1 FROM members WHERE space=? AND actor=?', (space, actor)).fetchone():
             raise Fault('forbidden', 'space membership required')
 
     def obj(self, db, space, oid, actor, write=False):
         row = db.execute('SELECT * FROM objects WHERE id=? AND space=?', (oid, space)).fetchone()
-        if not row or actor not in json.loads(row['writers' if write else 'readers']):
+        if not row or actor not in json.loads(row['writers' if write else 'readers']) or not self.world.object_visible(db, space, oid, row['version'], actor):
             raise Fault('not_found', 'object not found or inaccessible')
         return row
 
@@ -123,13 +137,16 @@ class Kernel:
         return sorted(set(readers)), sorted(set(writers))
 
     def event(self, db, space, kind, actor, subject, audience, version=None):
+        if kind.startswith('object.') and self.world.child(db,space):
+            audience = [r['actor'] for r in db.execute('SELECT actor FROM object_epochs WHERE object_id=? AND version=?',(subject,version))]
         cur = db.execute('INSERT INTO events(space,kind,actor,subject,version,audience,created) VALUES (?,?,?,?,?,?,?)',
                          (space, kind, actor, subject, version, encode(audience), time.time()))
+        self.world.snapshot_event(db, space, cur.lastrowid, audience)
         return cur.lastrowid
 
     def record(self, row):
         result = dict(row)
-        for key in ('readers', 'writers', 'capabilities'):
+        for key in ('readers', 'writers', 'capabilities', 'tags'):
             if key in result:
                 result[key] = json.loads(result[key])
         return result
@@ -140,19 +157,26 @@ class Kernel:
         with self.connection() as db:
             db.execute('BEGIN IMMEDIATE')
             try:
+                if db.execute('SELECT COUNT(*) FROM audit').fetchone()[0] >= self.max_audit or self.database_bytes(db) >= self.max_database_bytes:
+                    db.rollback()
+                    return {'ok': False, 'error': {'code':'quota','message':'global audit or storage budget exhausted; operator review required'}}
                 if not isinstance(request, dict) or set(request) - {'op', 'args', 'idempotency_key'}:
                     raise Fault('invalid', 'request fields are op, args, idempotency_key')
                 args = request.get('args', {})
                 if not isinstance(args, dict):
                     raise Fault('invalid', 'args must be an object')
-                if not isinstance(op, str) or op not in {'discover', 'get', 'history', 'events', 'inbox'} | MUTATIONS:
+                if not isinstance(op, str) or op not in {'discover', 'get', 'history', 'events', 'inbox'} | MUTATIONS | OPS:
                     raise Fault('invalid', 'unknown operation')
-                space = name(args.get('space'), 'space')
+                space = None if op == 'roots' else name(args.get('space'), 'space')
+                child = self.world.child(db, space) if space else None
+                root = child['root'] if child else space
                 try:
                     principal = fixture(identity) if isinstance(identity, str) and self.allow_fixture else identity
-                    principal = validate(principal, op, space)
+                    principal = validate(principal, op, root)
                     if principal.assurance == 'fixture' and not self.allow_fixture:
                         raise AuthenticationError('fixture identities disabled')
+                except AuthorizationError as exc:
+                    raise Fault('forbidden', str(exc))
                 except AuthenticationError as exc:
                     raise Fault('unauthenticated', str(exc))
                 name(actor, 'actor')
@@ -162,7 +186,9 @@ class Kernel:
                     binding = db.execute('SELECT actor,issuer,subject,client_id,control_domain FROM admission_bindings WHERE grant_id=?', (principal.grant_id,)).fetchone()
                     if binding is None or tuple(binding) != (actor, principal.issuer, principal.subject, principal.client_id, principal.control_domain):
                         raise Fault('unauthenticated', 'principal does not match immutable admission binding')
-                self.member(db, space, actor)
+                if root is not None:
+                    self.member(db, root, actor)
+                self.world.authorize(db, actor, op, space, args)
                 key = digest = None
                 if op in MUTATIONS:
                     key = name(request.get('idempotency_key'), 'idempotency_key')
@@ -177,6 +203,11 @@ class Kernel:
                         # Replays require current space membership, but return only the original
                         # mutation metadata (never object/message content), even after ACL revocation.
                         result = json.loads(prior['response'])
+                        if child and op in {'create','update','accept'}:
+                            receipt = result.get('result', {})
+                            self.obj(db,space,receipt.get('id'),actor)
+                            if not self.world.object_visible(db,space,receipt.get('id'),receipt.get('version'),actor):
+                                raise Fault('forbidden','receipt revision belongs to an inaccessible membership epoch')
                         if op == 'accept':
                             records = result.get('result', {}).get('acceptance', {}).get('records', [])
                             own = next((r for r in records if r.get('actor') == actor), None)
@@ -184,6 +215,8 @@ class Kernel:
                             if own is None or any(own.get(f) != getattr(principal, f) for f in fields):
                                 raise Fault('conflict', 'legacy or mismatched acceptance receipt cannot establish current agent attribution')
                         self.audit(db, actor, op, 'replay')
+                        if self.database_bytes(db) > self.max_database_bytes:
+                            raise Fault('quota','database page budget exhausted')
                         db.commit()
                         return result
                     used = db.execute('SELECT mutations FROM usage WHERE actor=?', (actor,)).fetchone()
@@ -195,32 +228,46 @@ class Kernel:
                     db.execute('INSERT INTO retries VALUES (?,?,?,?)', (actor, key, digest, encode(response)))
                     db.execute('INSERT INTO usage VALUES (?,1) ON CONFLICT(actor) DO UPDATE SET mutations=mutations+1', (actor,))
                 self.audit(db, actor, op, 'ok')
+                if self.database_bytes(db) > self.max_database_bytes:
+                    raise Fault('quota','database page budget exhausted')
                 db.commit()
                 return response
             except Fault as exc:
                 db.rollback()
                 self.audit(db, str(actor)[:80], str(op)[:80], exc.code)
-                db.commit()
+                if self.database_bytes(db) > self.max_database_bytes:
+                    db.rollback()  # Refusal itself must not exceed the configured storage ceiling.
+                else:
+                    db.commit()
                 return {'ok': False, 'error': {'code': exc.code, 'message': exc.message}}
+
+    @staticmethod
+    def database_bytes(db):
+        return db.execute('PRAGMA page_count').fetchone()[0] * db.execute('PRAGMA page_size').fetchone()[0]
 
     def audit(self, db, actor, op, outcome):
         db.execute('INSERT INTO audit(actor,op,outcome,created) VALUES (?,?,?,?)', (actor, op, outcome, time.time()))
 
     def dispatch(self, db, actor, op, space, a, principal):
+        if op in OPS:
+            return self.world.dispatch(db, actor, op, space, a, principal)
         allowed = {
             'discover': {'space'}, 'get': {'space', 'id'}, 'history': {'space', 'id', 'after', 'limit'},
             'events': {'space', 'after', 'limit'}, 'inbox': {'space', 'after', 'limit'},
-            'create': {'space', 'content', 'readers', 'writers'},
-            'update': {'space', 'id', 'expected_version', 'content', 'readers', 'writers'},
+            'create': {'space', 'content', 'readers', 'writers', 'title', 'tags'},
+            'update': {'space', 'id', 'expected_version', 'content', 'readers', 'writers', 'title', 'tags'},
             'send': {'space', 'recipient', 'content'},
             'accept': {'space', 'id', 'version', 'content_sha256'},
         }
         if set(a) - allowed[op]:
             raise Fault('invalid', 'unknown argument')
         if op == 'discover':
-            return {'identities': [self.record(r) for r in db.execute('SELECT i.* FROM identities i JOIN members m ON i.id=m.actor WHERE m.space=? ORDER BY i.id', (space,))],
-                    'protocol': 'gptopia-kernel/0.3', 'limits': {'content_bytes': MAX_CONTENT, 'mutation_quota': self.max_mutations, 'objects_per_owner': self.max_objects},
-                    'operations': sorted(allowed)}
+            sql = ('SELECT i.* FROM identities i JOIN child_members m ON i.id=m.actor WHERE m.space=? AND m.active=1 ORDER BY i.id'
+                   if self.world.child(db,space) else 'SELECT i.* FROM identities i JOIN members m ON i.id=m.actor WHERE m.space=? ORDER BY i.id')
+            return {'identities': [self.record(r) for r in db.execute(sql, (space,))],
+                    'protocol': 'gptopia-kernel/0.4', 'limits': {'content_bytes': MAX_CONTENT, 'mutation_quota': self.max_mutations, 'objects_per_owner': self.max_objects},
+                    'effective_scopes': sorted(set(principal.scopes) & set(SCOPES.values())),
+                    'operations': sorted(x for x in set(allowed)|OPS if SCOPES[x] in principal.scopes and (x not in {'spaces','space_create'} if self.world.child(db,space) else x not in {'space_get','space_invite','space_accept','space_remove','space_leave','post','entries'}))}
         if op in {'get', 'history', 'update', 'accept'}:
             row = self.obj(db, space, name(a.get('id'), 'id'), actor, op == 'update')
         if op == 'get':
@@ -236,11 +283,11 @@ class Kernel:
                 raise Fault('invalid', 'after must be nonnegative integer; limit must be 1–100')
         if op == 'history':
             # Both current ACL and historical ACL must allow a historical read.
-            rows = db.execute('SELECT * FROM versions WHERE object_id=? AND version>? ORDER BY version', (row['id'], after))
+            rows = db.execute('SELECT * FROM versions WHERE object_id=? AND version>? ORDER BY version LIMIT ?', (row['id'], after, SCAN))
             out, cursor = [], after
             for r in rows:
                 cursor = r['version']
-                if actor in json.loads(r['readers']):
+                if actor in json.loads(r['readers']) and self.world.object_visible(db,space,row['id'],r['version'],actor):
                     item = self.record(r)
                     item['content_sha256'] = self.content_hash(r['content'])
                     item['acceptance'] = self.acceptance_status(db, r['object_id'], r['version'], item['content_sha256'])
@@ -249,15 +296,15 @@ class Kernel:
                     break
             return {'items': out, 'next_cursor': cursor}
         if op == 'events':
-            rows = db.execute('SELECT * FROM events WHERE space=? AND seq>? ORDER BY seq', (space, after))
+            rows = db.execute('SELECT * FROM events WHERE space=? AND seq>? ORDER BY seq LIMIT ?', (space, after, SCAN))
             out, cursor = [], after
             for r in rows:
                 cursor = r['seq']
-                if actor not in json.loads(r['audience']):
+                if actor not in json.loads(r['audience']) or not self.world.event_visible(db,space,r['seq'],actor):
                     continue
                 if r['kind'].startswith('object.'):
-                    current = db.execute('SELECT readers FROM objects WHERE id=?', (r['subject'],)).fetchone()
-                    if not current or actor not in json.loads(current[0]):
+                    current = db.execute('SELECT readers,version FROM objects WHERE id=?', (r['subject'],)).fetchone()
+                    if not current or actor not in json.loads(current[0]) or not self.world.object_visible(db,space,r['subject'],current['version'],actor):
                         continue
                 item = dict(r)
                 del item['audience']
@@ -266,8 +313,15 @@ class Kernel:
                     break
             return {'items': out, 'next_cursor': cursor}
         if op == 'inbox':
-            rows = db.execute("SELECT e.seq,m.* FROM events e JOIN messages m ON e.subject=m.id WHERE e.kind='message.sent' AND m.space=? AND m.recipient=? AND e.seq>? ORDER BY e.seq LIMIT ?", (space, actor, after, limit)).fetchall()
-            return {'items': [dict(r) for r in rows], 'next_cursor': rows[-1]['seq'] if rows else after}
+            rows = db.execute("SELECT e.seq,m.* FROM events e JOIN messages m ON e.subject=m.id WHERE e.kind='message.sent' AND m.space=? AND m.recipient=? AND e.seq>? ORDER BY e.seq LIMIT ?", (space, actor, after, SCAN)).fetchall()
+            items, cursor = [], after
+            for r in rows:
+                cursor = r['seq']
+                if self.world.event_visible(db,space,r['seq'],actor):
+                    items.append(dict(r))
+                if len(items) >= limit:
+                    break
+            return {'items': items, 'next_cursor': cursor}
         if op == 'accept':
             digest = self.content_hash(row['content'])
             if type(a.get('version')) is not int or a['version'] != row['version'] or a.get('content_sha256') != digest:
@@ -302,9 +356,11 @@ class Kernel:
                     raise Fault('forbidden', 'only owner can change ACL')
                 readers, writers = self.acl(db, space, a, owner)
         body = content(a.get('content'))
-        db.execute('INSERT INTO objects VALUES (?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET version=excluded.version,content=excluded.content,readers=excluded.readers,writers=excluded.writers',
-                   (oid, space, owner, version, body, encode(readers), encode(writers)))
-        db.execute('INSERT INTO versions VALUES (?,?,?,?,?,?,?)', (oid, version, actor, body, encode(readers), encode(writers), time.time()))
+        title, tags = metadata(a, row if op == 'update' else None)
+        db.execute('INSERT INTO objects(id,space,owner,version,content,readers,writers,title,tags) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET version=excluded.version,content=excluded.content,readers=excluded.readers,writers=excluded.writers,title=excluded.title,tags=excluded.tags',
+                   (oid, space, owner, version, body, encode(readers), encode(writers), title, encode(tags)))
+        db.execute('INSERT INTO versions(object_id,version,author,content,readers,writers,created,title,tags) VALUES (?,?,?,?,?,?,?,?,?)', (oid, version, actor, body, encode(readers), encode(writers), time.time(), title, encode(tags)))
+        self.world.snapshot_object(db, space, oid, version, readers, explicit_grant=('readers' in a and 'writers' in a))
         seq = self.event(db, space, 'object.' + ('created' if op == 'create' else 'updated'), actor, oid, readers, version)
         return {'id': oid, 'version': version, 'event': seq, 'owner': owner, 'author': actor, 'content_sha256': self.content_hash(body)}
 
@@ -338,7 +394,7 @@ class Server(ThreadingHTTPServer):
         super().__init__(address, Handler)
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = 'GPTopiaTestKernel/0.3'
+    server_version = 'GPTopiaTestKernel/0.4'
     def log_message(self, *args):
         pass
     def setup(self):
@@ -413,7 +469,7 @@ def main():
             parser.error('database not found')
         with sqlite3.connect(f'file:{Path(args.db).resolve()}?mode=ro', uri=True) as db:
             db.row_factory = sqlite3.Row
-            print(encode({table: [dict(r) for r in db.execute(f'SELECT * FROM {table}')] for table in ['identities', 'members', 'objects', 'versions', 'messages', 'events', 'acceptances', 'usage', 'audit']}))
+            print(encode({table: [dict(r) for r in db.execute(f'SELECT * FROM {table}')] for table in ['identities', 'members', 'objects', 'versions', 'messages', 'events', 'acceptances', 'usage', 'audit', 'child_spaces', 'child_members', 'space_invites', 'entries', 'object_epochs', 'event_epochs', 'admission_bindings'] if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)).fetchone()}))
 
 if __name__ == '__main__':
     main()

@@ -1,0 +1,38 @@
+{
+  "mode": "local synthetic Node + Python child, fixture JWTs in memory only",
+  "container_measured": false,
+  "docker_available": false,
+  "podman_available": false,
+  "heap_cap_mib": 96,
+  "sampled_combined_peak_rss_bytes": 124301312,
+  "node_cpu_seconds": 0.75,
+  "python_cpu_seconds": 0.47,
+  "elapsed_seconds": 1.2605,
+  "samples": 97,
+  "workload": {
+    "phase": "complete",
+    "synthetic": true,
+    "posts": 20,
+    "revisions": 11,
+    "concurrent_readers": 4,
+    "read_calls": 12,
+    "node_cpu": {
+      "user": 616327,
+      "system": 135944
+    },
+    "node_memory": {
+      "rss": 92798976,
+      "heapTotal": 40144896,
+      "heapUsed": 25709912,
+      "external": 12510624,
+      "arrayBuffers": 8385692
+    }
+  },
+  "no_external_services_or_live_data": true,
+  "limitations": [
+    "10ms RSS sampling can miss peaks",
+    "host runtime is not Railway container sizing proof",
+    "initialization is excluded before first ready sample",
+    "no production identity provider or real-agent proof"
+  ]
+}
