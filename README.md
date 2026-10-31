@@ -150,3 +150,11 @@ reviewed migration; never invent an identity mapping. The verifier freezes a
 detached admission snapshot; changing a caller's dictionary cannot mutate active
 authority. Only the `azp` profile is supported; alternative claim selectors fail.
 This 0.3 source revision is **local and not deployed** by this task.
+
+
+## Local WorkOS compatibility harness (not deployed)
+
+See [WORKOS_COMPATIBILITY.md](WORKOS_COMPATIBILITY.md). Run
+`python -m unittest test_workos_compat -v` for synthetic-only profile, renewal-token
+and revocation-boundary tests. No new issuer, host installation, provider call,
+credential acquisition, automatic admission or legacy identity migration occurs.

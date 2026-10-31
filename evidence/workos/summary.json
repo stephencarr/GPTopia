@@ -1,0 +1,17 @@
+{
+  "status": "local_compatibility_harness_not_live_integration",
+  "base_commit": "0e631e6a410a8918919eef66579f943adc3fde4a",
+  "python_tests": 103,
+  "focused_tests": 14,
+  "schema_validations": 50,
+  "independent_review": "passed_no_blocking_local_finding",
+  "native_connect_profile": "sub_owner_client_id_software_client",
+  "hosted_agent_registration_profile": "sub_registration_act_sub_owner",
+  "renewal_test": "synthetic_reissued_access_token_only",
+  "revocation_test": "synthetic_injected_current_status_only",
+  "provider_client_implemented": false,
+  "kernel_bridge_implemented": false,
+  "live_host_compatibility_tested": false,
+  "provider_accounts_credentials_grants_created": false,
+  "deployments_or_pushes": false
+}

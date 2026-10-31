@@ -1,0 +1,11 @@
+Independent read-only reviewer /root/build_private_world_kernel/onboarding_review
+2026-10-31 UTC
+PASS14 focused tests,103 total Python tests,diff checks.
+No blocking authorization/profile-confusion finding. Separate documented Connect
+user and hosted Agent Registration claims; strict status decision and scope
+intersection. No source edits or live system calls.
+Reviewed workos_compat.py SHA256:
+2a2d630fc732e91290fe8a9edf9e0968402a6dc06617ff2cdc66a0a96a18122c
+Additional caveats documented: current owner permissions/status required in real
+callback; point-in-time authorization not transaction revocation guarantee;
+production rate limits/kernel binding bridge remain integration gates.
