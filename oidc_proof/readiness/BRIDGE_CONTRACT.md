@@ -63,3 +63,42 @@ A green test here confirms the documented incompatibility, not deployment readin
 
 This finding is a bounded next engineering task. It does not justify another
 host sign-in or a replacement public deployment today.
+
+## Local V2 seam prototype (same-day follow-on)
+
+`grant_bridge.py` adds an explicitly selected `GrantBoundVerifier` and
+`ProofBoundary` outside production code. It distinguishes `oauth_grant_id` from
+`admission_id`; the latter remains the kernel Principal's immutable `grant_id`.
+It verifies synthetic signed portable JWTs, requires both current provider grant
+and application admission, intersects token ∩ current provider-grant ∩ current application-admission scopes, and produces no actor from token
+name/actor claims. Wrong binding, expiry, inactive or unavailable state denies.
+
+`ProofBoundary` serializes local revocation and token verification plus the
+complete kernel request under one process lock. The request path does not reuse
+cached Principals. This prevents between-request local revocation being ignored;
+it is **not distributed atomicity** against an independently running provider.
+
+The test-only fresh V2 SQLite registry preserves authentic same-owner/client
+attribution while allowing separate immutable admission IDs/actors. It refuses
+any existing registry or identities and never migrates the pilot database. Schema
+creation and in-memory grant/admission installation are not a durable recovery
+protocol: setup failure can require discarding this temporary test database.
+
+Run the thirteen seam tests:
+
+```sh
+python oidc_proof/readiness/test_grant_bridge.py
+```
+
+The tests perform real kernel create/update operations as distinct synthetic
+actors sharing the same owner/client/control domain. This does not attest
+independent runtimes. Additional tests cover revocation between requests,
+unknown/wrong bindings, inactive admission, unavailable state, scope escalation,
+inert actor claims, current provider-scope narrowing, missing/mismatched/expired provider state, setup rollback of all identity/binding/member rows, concurrent local request/revoke ordering, and immutable-registry mismatch/reinitialization rejection.
+
+**Not implemented:** connection to the real proof provider's live Grant store,
+durable admission storage, cross-process revocation synchronization, restart and
+transactional recovery, owner approval/reconnect flows, signing key lifecycle,
+legacy data migration or production wiring. Existing legacy verifier, kernel and
+MCP deployment code remain unchanged. The seam is a local design/test artifact,
+not a release candidate or replacement authentication server.

@@ -124,6 +124,29 @@ These numbers make a small footprint plausible, but do not certify the current
 
 ## Exact next gate and stopping rule
 
+### Local bridge follow-on (31 October 2026)
+
+The isolated `readiness/grant_bridge.py` V2 seam now connects signed synthetic
+portable claims to the actual kernel using separate OAuth-grant and application
+admission identities. It never changes the default verifier or migrates old data.
+Run from the repository root:
+
+```sh
+python oidc_proof/readiness/test_bridge_contract.py
+python oidc_proof/readiness/test_grant_bridge.py
+```
+
+Five incompatibility-characterization tests and thirteen seam tests pass. The
+seam uses fresh test databases and in-memory current grant/admission state under
+one process lock. Effective scopes intersect token, current provider grant and
+current application admission. Same-owner/client actors create distinct kernel
+revisions, and revocation, missing state and mismatched binding deny access.
+Independent review caught and corrected the missing provider-scope intersection.
+The legacy 89 Python tests and original ten OAuth/storage tests were also rerun
+successfully. See `readiness/BRIDGE_CONTRACT.md` for remaining implementation
+requirements. This is **not** connected to the provider Grant store, durable
+admission recovery, real hosts or any deployed application.
+
 Keep the current pilot/source/volume untouched. Before live staging, obtain the
 required approval for any deployment, credentials, resource changes or grants.
 Use a copy/backup and explicit rollback reconciliation, never silent identity
