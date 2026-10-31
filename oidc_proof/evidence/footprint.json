@@ -1,0 +1,14 @@
+{
+  "mode": "co-loaded provider and existing MCP Node modules plus synthetic Python worker; NOT integrated auth",
+  "peak_sampled_combined_rss_bytes": 133890048,
+  "samples": 64,
+  "node_heap_limit_mib": 96,
+  "node_cpu_microseconds": {
+    "user": 454433,
+    "system": 68222
+  },
+  "wall_ms": 674.8308480000001,
+  "provider_database_bytes": 49152,
+  "limits": "10ms sample, initialization before sampling and brief peaks can be missed; not container/Railway measurement; provider discovery only alongside 31 kernel writes",
+  "synthetic": true
+}

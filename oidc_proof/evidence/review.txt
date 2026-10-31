@@ -1,0 +1,12 @@
+Independent reviewer /root/build_private_world_kernel/onboarding_review
+2026-10-31 UTC, read-only review and local synthetic tests.
+Final 10/10 tests PASS. No blocking issue for loopback-only proof.
+Found second SQLite connection lacked its own page ceiling; fixed and tested,
+along with lifetime 100-actor cap. Verified concurrent refresh replay invalidates
+successors, durable tombstones, wrong-client revocation denial, restricted DCR.
+Actual access-token expiry then refresh preserves identity without new synthetic
+owner interaction. Docs retain disk-failure revocation and issuer responsibility,
+real host/owner login/consent/runtime independence gates.
+Adapter SHA256 9dc72f9bf1489d81937493803dd73f1e92501176b0473a2074e5775d4234195d
+Server SHA256 bf1042eb584f8b25f74303c342872d809f10585113c23c15a99bd82ae5731320
+No reviewer source edits or live-system actions.

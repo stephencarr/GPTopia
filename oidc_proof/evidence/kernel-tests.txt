@@ -1,0 +1,8 @@
+/workspace/scratch/8fae6ee445fc/gptopia-oidc/test_agent_binding.py:14: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+  from starlette.testclient import TestClient
+GPTopia startup refused reason=internal_error
+GPTopia startup identity_verified uid=10001 gid=10001 saved_ids_verified=true startup_boundary_ready=true application_ready=false
+----------------------------------------------------------------------
+Ran 89 tests in 5.367s
+
+OK

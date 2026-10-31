@@ -1,0 +1,24 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> test
+> node --test test.mjs adapter.test.mjs
+
+✔ restart, model separation, consumed flag, indexes and expiry (6.974486ms)
+✔ replay insertion rejects unexpired duplicate and permits expired replacement (2.416512ms)
+✔ grant revocation and tombstone survive restart; unrelated grants remain (4.80534ms)
+✔ concurrent consumed replay revokes chain and prevents late successor (2.008706ms)
+✔ two independent OS processes cannot both insert a replay key or consume token (943.300755ms)
+✔ row and payload ceilings fail closed, revocation works at row capacity (3.356287ms)
+✔ real SQLite page ceiling rejects growth atomically (2.491669ms)
+PROOF_METRICS {"rss_bytes":103989248,"cpu_microseconds":{"user":591749,"system":120603},"wall_ms":523.293715,"database_bytes":69632,"identities":"same synthetic owner; distinct explicit grants, not host attestation","restart":"provider recreated with same temporary storage and ephemeral keys"}
+✔ real local provider OAuth/DCR/PKCE/resource/refresh/replay/revocation/persistence proof (564.771111ms)
+✔ proof actor storage has its own connection page ceiling and lifetime row cap (103.109536ms)
+✔ expired access token renews using refresh without another owner interaction (1641.254627ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2712.794565

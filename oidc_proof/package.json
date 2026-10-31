@@ -1,0 +1,11 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test.mjs adapter.test.mjs"
+  },
+  "dependencies": {
+    "oidc-provider": "9.13.3",
+    "jose": "6.1.3"
+  }
+}

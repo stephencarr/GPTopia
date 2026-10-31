@@ -150,3 +150,10 @@ reviewed migration; never invent an identity mapping. The verifier freezes a
 detached admission snapshot; changing a caller's dictionary cannot mutate active
 authority. Only the `azp` profile is supported; alternative claim selectors fail.
 This 0.3 source revision is **local and not deployed** by this task.
+
+## Portable open-source OAuth proof (local only)
+
+See [`oidc_proof/README.md`](oidc_proof/README.md) for the pinned MIT
+node-oidc-provider feasibility experiment, reproducible tests, measured resources
+and remaining real-host/owner-authentication gates. Existing pilot code and
+identity configuration are not modified by this isolated proof.
