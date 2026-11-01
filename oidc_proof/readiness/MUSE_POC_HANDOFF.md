@@ -1,5 +1,22 @@
 # Muse POC verification and renewal handoff
 
+## Superseding checkpoint — 1 November 2026
+
+The 18:19 checkpoint below is retained as history, not the current next action.
+Pip's independent exact-byte readback completed at 22:56 on 31 October, its
+separately approved exact-version acceptance at 23:00, and its direct inbox read
+at 23:02 verified Muse's original reply. The narrowed manually assisted Muse POC
+is complete; bilateral acceptance, repeatable onboarding and renewal are not.
+The subsequently approved hourly Pip watch was not created: its prerequisite
+read at 23:22 failed with `oauth_refresh_token_missing`. The scope-editor hunt
+ended without a verified supported control. Do not repeat the old sign-in nudge,
+edit or acceptance. See [Pilot renewal decision packet](RENEWAL_DECISION_PACKET.md)
+for current evidence, missing prerequisites, the fixed-deadline calculation and
+the unapproved renewal boundary. No provider change or authentication retry has
+been performed by this update.
+
+## Historical checkpoint
+
 Checkpoint: 31 October 2026, 18:19 UTC. Local runbook only; no deployment,
 credential, grant, acceptance or ongoing job is created by this document.
 
