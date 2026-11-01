@@ -68,6 +68,47 @@ There is no executable provider-change approval request yet: prerequisites 1 and
 2 are unresolved. The smallest immediate missing item is verified supported
 host/provider configuration evidence, not another generic “please reconnect.”
 
+## Server-driven reauthorization lead — reviewed 1 November, 13:15 UTC
+
+The official OpenAI guide documents per-tool OAuth `securitySchemes`, protected
+resource metadata and `mcp/www_authenticate` error challenges as a route to the
+linking UI. It also documents reauthorization for added scopes. This establishes
+a general route that does not depend on an existing-plugin scope-editor menu.
+The guide contains no `offline_access` reference and does not establish whether
+this connection requests, retains or refreshes an offline grant.
+[OpenAI plugin authentication](https://developers.openai.com/plugins/build/auth)
+
+This mechanism was already considered and implemented, not a newly missing
+feature. Read-only inspection of local `gptopia` commit
+`0e631e6a410a8918919eef66579f943adc3fde4a` found:
+
+- `mcp_adapter/server.mjs:128-146` emits top-level `securitySchemes` and its
+  `_meta` mirror, uses `requireScopes(...t.requiredScopes)`, and includes a
+  tool-result `mcp/www_authenticate` challenge for a late worker 401.
+- Lines 122 and 162-165 use a normal HTTP 401 challenge before MCP dispatch for
+  missing or invalid credentials. Resource metadata is emitted at lines 153-154.
+  Installed SDK code returns an HTTP insufficient-scope challenge for its
+  `requireScopes` check; not every denial enters the tool handler.
+- `mcp_adapter/README.md:144-153` already documented those paths and their
+  historical synthetic HTTP coverage on 30 October. No tests were rerun for
+  this inspection, and no real-host OAuth behavior was inferred from them.
+- The contract declares only seven application scopes. `world_inbox` requires
+  only `messages:read`; no tool asks for `offline_access`. The Node metadata
+  validator (`server.mjs:105-109`) accepts only scopes present in that contract;
+  Python `production.py:168-175` likewise accepts only kernel scopes. Merely
+  appending `offline_access` to the advertised-scope environment would be rejected.
+
+Implication: this is an identified design seam for a future specifically
+approved experiment, **not a verified renewable-access fix**. Keep OAuth consent
+request scopes distinct from API operation requirements; changing the current
+shared `requiredScopes` field also changes API enforcement. Do not blindly make
+every read require `offline_access`, assume it will appear in an access token,
+or change deployed metadata merely to provoke consent. Existing metadata does
+not currently request it, and adding a generic reauthorization challenge alone
+would not prove a refresh token was issued. Current provider-state verification,
+explicit renewable-grant approval and actual host post-expiry verification remain
+necessary. No live endpoint, auth flow or blocked provider origin was retried.
+
 ## Candidate approval boundary — not approved
 
 - Existing API audience: `https://world-pilot.up.railway.app`.
