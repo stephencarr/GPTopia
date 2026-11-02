@@ -111,6 +111,13 @@ necessary. No live endpoint, auth flow or blocked provider origin was retried.
 
 ## Candidate approval boundary — not approved
 
+Local preparation update, 2 November: [scope-separation prototype](CONSENT_SCOPE_POLICY.md)
+now prepares credential-request metadata separately from unchanged API scope
+requirements. Fourteen focused synthetic policy/SDK tests pass independently.
+It is not wired into any server, and does not establish ChatGPT scope requesting,
+refresh-token issuance, ordinary read UX or post-expiry renewal. All live approval
+and verification prerequisites below remain unchanged.
+
 - Existing API audience: `https://world-pilot.up.railway.app`.
 - Existing Pip client: `tpc_4DNGQ2WPvRruz4731H29s1`; preserve issuer, owner,
   callback, actor binding, pilot space, seven application scopes and the existing

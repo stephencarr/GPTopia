@@ -1,0 +1,22 @@
+✔ default policy preserves API and consent scopes for all nine canonical operations (2.190834ms)
+✔ opt-in read consent metadata includes offline_access but API requirements do not (0.304618ms)
+✔ optional scope requests are unavailable for mutating operations (0.448865ms)
+✔ read credential metadata cannot satisfy send, write or accept requirements (0.206681ms)
+✔ unknown, malformed, duplicate and application scopes in credential options fail closed (0.348354ms)
+✔ unknown tools and unsupported options cannot replace canonical requirements (0.270557ms)
+✔ returned metadata is deeply frozen and detached from caller arrays and mirrors (0.327492ms)
+✔ serialization retains equal metadata mirrors but makes no grant or credential claim (0.204458ms)
+✔ ordinary scope gating still depends on the existing upstream authentication boundary (0.193792ms)
+✔ prototype calls do not alter the authoritative operation contract (0.29882ms)
+✔ sparse credential arrays and explicitly undefined values fail closed (0.193891ms)
+✔ credential opt-in must be an own data property on a plain configuration record (0.176155ms)
+✔ caller-controlled array iterator cannot substitute an API permission (0.162094ms)
+✔ scope-array accessors and nonstandard option keys are rejected without invoking getters (0.253721ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 184.522456
