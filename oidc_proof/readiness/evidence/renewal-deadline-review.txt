@@ -1,0 +1,12 @@
+Independent review, 3 November 2026
+
+Final 13 tests independently rerun and passed. Earlier review found dataclass
+numeric equality allowed float/bool computed lifetime fields; strict positive
+integer checks and regression probes now reject both.
+
+Reviewer additionally reports a 100,000-case deterministic invariant sweep:
+48,967 accepted and 51,033 correctly rejected, checking rounding, idle cap,
+feasibility and fixed-cutoff arithmetic. This sweep is supplemental reviewer
+reported evidence; the reproducible checked-in test suite is the 13-method suite.
+No outstanding issue found within offline scope. No external calls, live provider
+verification or independent-runtime interoperability established.

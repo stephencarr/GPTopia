@@ -204,3 +204,12 @@ No relay of that authorization or successful Muse acceptance is established in
 the retained evidence. Do not resend or infer it. Pilot-only standing reply
 authority is also unanswered; the read-only watch does not grant it. Neither
 decision should be bundled into the renewable-credential consent.
+
+## Offline cutoff guard — 3 November 2026
+
+The historical 2 November consent window must not be reused now. The local
+[fixed-cutoff guard](RENEWAL_DEADLINE_GUARD.md) makes stale-window rejection and
+downward duration rounding executable, with 13 focused deterministic test methods.
+It neither changes provider configuration nor establishes approval or host support.
+All current-state, supported-consent and explicit-authorization prerequisites above
+remain open. The fixed server cutoff is unchanged.

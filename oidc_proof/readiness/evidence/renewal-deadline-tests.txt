@@ -1,0 +1,18 @@
+test_deadline_boundary (test_renewal_deadline_guard.DeadlineTests.test_deadline_boundary) ... ok
+test_forged_equal_noninteger_duration_rejected (test_renewal_deadline_guard.DeadlineTests.test_forged_equal_noninteger_duration_rejected) ... ok
+test_historical_packet_example (test_renewal_deadline_guard.DeadlineTests.test_historical_packet_example) ... ok
+test_idle_step (test_renewal_deadline_guard.DeadlineTests.test_idle_step) ... ok
+test_issuance_types (test_renewal_deadline_guard.DeadlineTests.test_issuance_types) ... ok
+test_many_windows_preserve_invariant (test_renewal_deadline_guard.DeadlineTests.test_many_windows_preserve_invariant) ... ok
+test_reversed_window (test_renewal_deadline_guard.DeadlineTests.test_reversed_window) ... ok
+test_round_down (test_renewal_deadline_guard.DeadlineTests.test_round_down) ... ok
+test_stale_example_rejected (test_renewal_deadline_guard.DeadlineTests.test_stale_example_rejected) ... ok
+test_strict_input_types (test_renewal_deadline_guard.DeadlineTests.test_strict_input_types) ... ok
+test_tampered_plan_rejected (test_renewal_deadline_guard.DeadlineTests.test_tampered_plan_rejected) ... ok
+test_window_boundaries (test_renewal_deadline_guard.DeadlineTests.test_window_boundaries) ... ok
+test_zero_margin_or_step_rejected (test_renewal_deadline_guard.DeadlineTests.test_zero_margin_or_step_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 0.005s
+
+OK
