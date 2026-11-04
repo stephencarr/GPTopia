@@ -109,3 +109,21 @@ The archive branches and proposal are local and reviewable even while publicatio
 is blocked. A future developer should use the existing checkout; no new worktree
 or replacement repository is necessary. Read this record before attempting a
 live test, and keep the original handover evidence immutable.
+
+## Publication access update, 4 November 2026
+
+The environment network change is now enforced and GitHub API access succeeds.
+Repository metadata confirms `private: true`, default branch `main`, and push
+permission. The documentation commit survived restoration with a clean worktree.
+The API reports zero GitHub Actions workflows and no check runs or commit statuses
+on main. Webhook and deployment listing both return HTTP403 `Resource not
+accessible by integration`; the injected GitHub integration lacks those read
+capabilities despite the repository-level permissions reported by metadata.
+
+The earlier network blocker is resolved. The remaining gate is verifying Railway
+auto-deploy/source-branch and PR-environment settings plus other deployment hooks.
+No push or PR creation has been attempted. Obtain a current operator confirmation
+that the five `archive/pip-*` branches and `docs/architecture-reset`, including
+opening its draft PR, cannot trigger deployment; alternatively provide an
+authorized read-only route to those settings. Do not publish the cloud environment
+again merely to address this repository-integration permission limit.

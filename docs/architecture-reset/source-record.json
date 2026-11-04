@@ -35,5 +35,5 @@
   "checksums": "All payload checksums passed; archive checksum is locally computed, not externally authenticated",
   "bundle_verify": "Complete history; no prerequisites",
   "fsck": "Passed after import",
-  "remote_publication": "Pending deployment-trigger verification and GitHub API access"
+  "remote_publication": "Pending deployment-trigger verification; GitHub API network access and private repository metadata verified"
 }
