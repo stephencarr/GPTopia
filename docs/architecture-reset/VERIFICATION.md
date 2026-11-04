@@ -72,7 +72,7 @@ deployment test was performed. `git diff --check` passed for this documentation.
 | Current deployed commit and shutdown automation | Handover records baseline and cutoff, but live deployment state, external schedules and current admission configuration are unverified |
 | Repository privacy and deployment triggers | Private is the user's required policy; current API-level verification is blocked. No visibility changes made |
 
-## Publication blocker and safe continuation
+## Historical publication blocker and continuation checks
 
 No remote branches have been pushed and no draft PR has been opened.
 `gh api repos/stephencarr/GPTopia` returned Forbidden. A direct HTTPS request
@@ -110,7 +110,7 @@ is blocked. A future developer should use the existing checkout; no new worktree
 or replacement repository is necessary. Read this record before attempting a
 live test, and keep the original handover evidence immutable.
 
-## Publication access update, 4 November 2026
+## Historical publication access update, 4 November 2026
 
 The environment network change is now enforced and GitHub API access succeeds.
 Repository metadata confirms `private: true`, default branch `main`, and push
@@ -127,3 +127,17 @@ that the five `archive/pip-*` branches and `docs/architecture-reset`, including
 opening its draft PR, cannot trigger deployment; alternatively provide an
 authorized read-only route to those settings. Do not publish the cloud environment
 again merely to address this repository-integration permission limit.
+
+## Publication gate resolved and archive branches published
+
+The operator confirmed Railway deploys from `main`, then confirmed completion
+of the check to leave PR Environments disabled in Project Settings → Environments.
+This is operator confirmation, not direct API inspection of Railway. GitHub
+webhook/deployment API visibility remains limited as recorded above.
+
+All five archive branches were pushed atomically without force and their remote
+commit IDs verified against `source-record.json`. Remote `main` remains
+`89910e7e90ce5fb303dd5ff3b5e089f5b97b4c5f`, and repository metadata confirms it
+is private. The documentation branch is prepared for publication and a draft PR
+targeting main; this supersedes the earlier publication blockers. No runtime
+implementation or live service operation is part of this proposal.
