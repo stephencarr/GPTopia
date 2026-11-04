@@ -213,3 +213,16 @@ downward duration rounding executable, with 13 focused deterministic test method
 It neither changes provider configuration nor establishes approval or host support.
 All current-state, supported-consent and explicit-authorization prerequisites above
 remain open. The fixed server cutoff is unchanged.
+
+## In-flight cutoff candidate — 4 November 2026
+
+A separate [local boundary review and hardening candidate](CUTOFF_BOUNDARY_HARDENING.md)
+found that work crossing the configured cutoff during verification/body/queue
+waits could succeed when admission expiry was later; a transaction also lacked a
+final authority check. The candidate carries the cutoff into Principal expiry,
+rechecks the resource boundary and rolls back world changes if authority expires
+before the final pre-commit check. Fourteen focused deterministic tests pass,
+with existing Python/transport/contract regressions also passing. This is not a
+hard real-time shutdown, token revocation or deployed fix. No live setting,
+service, credential, grant or pilot deadline changed. Renewal approval and real-host
+verification remain separate and unresolved.

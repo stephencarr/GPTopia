@@ -1,0 +1,38 @@
+test_actor_claim_is_inert_and_registry_mismatch_fails_kernel (__main__.V2BridgeTests.test_actor_claim_is_inert_and_registry_mismatch_fails_kernel) ... ok
+test_current_admission_inactive_or_mismatched_denies (__main__.V2BridgeTests.test_current_admission_inactive_or_mismatched_denies) ... ok
+test_distinct_same_owner_client_actors_make_real_kernel_revisions (__main__.V2BridgeTests.test_distinct_same_owner_client_actors_make_real_kernel_revisions) ... ok
+test_duplicate_actor_setup_rolls_back_all_identity_rows (__main__.V2BridgeTests.test_duplicate_actor_setup_rolls_back_all_identity_rows) ... ok
+test_missing_provider_or_admission_denies (__main__.V2BridgeTests.test_missing_provider_or_admission_denies) ... ok
+test_provider_binding_expiry_and_malformed_scope_deny (__main__.V2BridgeTests.test_provider_binding_expiry_and_malformed_scope_deny) ... ok
+test_provider_scope_narrowing_applies_to_existing_token (__main__.V2BridgeTests.test_provider_scope_narrowing_applies_to_existing_token) ... ok
+test_registry_reinitialization_refuses_legacy_or_existing_data (__main__.V2BridgeTests.test_registry_reinitialization_refuses_legacy_or_existing_data) ... ok
+test_request_and_revoke_are_serialized_with_single_process_lock (__main__.V2BridgeTests.test_request_and_revoke_are_serialized_with_single_process_lock) ... ok
+test_revocation_between_operations_denies_previously_valid_token (__main__.V2BridgeTests.test_revocation_between_operations_denies_previously_valid_token) ... ok
+test_scope_intersection_prevents_escalation (__main__.V2BridgeTests.test_scope_intersection_prevents_escalation) ... ok
+test_unavailable_provider_or_admission_denies (__main__.V2BridgeTests.test_unavailable_provider_or_admission_denies) ... ok
+test_unknown_and_wrong_binding_claims_deny (__main__.V2BridgeTests.test_unknown_and_wrong_binding_claims_deny) ... ok
+
+----------------------------------------------------------------------
+Ran 13 tests in 0.072s
+
+OK
+test_naive_client_alias_collapses_distinct_oauth_grants (__main__.BridgeContractTests.test_naive_client_alias_collapses_distinct_oauth_grants) ... ok
+test_portable_claim_profile_is_rejected_without_explicit_bridge (__main__.BridgeContractTests.test_portable_claim_profile_is_rejected_without_explicit_bridge) ... ok
+test_replacing_principal_grant_without_registry_migration_fails_closed (__main__.BridgeContractTests.test_replacing_principal_grant_without_registry_migration_fails_closed) ... ok
+test_two_actors_for_same_owner_client_are_rejected_by_old_registry (__main__.BridgeContractTests.test_two_actors_for_same_owner_client_are_rejected_by_old_registry) ... ok
+test_unrecognized_oauth_grant_is_not_a_legacy_denial_signal (__main__.BridgeContractTests.test_unrecognized_oauth_grant_is_not_a_legacy_denial_signal) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.101s
+
+OK
+...
+----------------------------------------------------------------------
+Ran 3 tests in 0.009s
+
+OK
+.............
+----------------------------------------------------------------------
+Ran 13 tests in 0.005s
+
+OK

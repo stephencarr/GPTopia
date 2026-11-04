@@ -1,0 +1,19 @@
+test_both_boundaries_work_immediately_before_cutoff (__main__.CutoffBoundaryTests.test_both_boundaries_work_immediately_before_cutoff) ... ok
+test_http_body_crossing_cutoff_has_no_persistence (__main__.CutoffBoundaryTests.test_http_body_crossing_cutoff_has_no_persistence) ... ok
+test_http_exact_entry_cutoff_skips_verifier_and_persistence (__main__.CutoffBoundaryTests.test_http_exact_entry_cutoff_skips_verifier_and_persistence) ... ok
+test_http_execution_queue_crossing_cutoff_denies_both_mutations (__main__.CutoffBoundaryTests.test_http_execution_queue_crossing_cutoff_denies_both_mutations) ... ok
+test_http_passes_shorter_of_principal_and_pilot_expiry (__main__.CutoffBoundaryTests.test_http_passes_shorter_of_principal_and_pilot_expiry) ... ok
+test_http_verification_crossing_cutoff_has_no_persistence (__main__.CutoffBoundaryTests.test_http_verification_crossing_cutoff_has_no_persistence) ... ok
+test_kernel_database_wait_crossing_cutoff_denies_before_dispatch (__main__.CutoffBoundaryTests.test_kernel_database_wait_crossing_cutoff_denies_before_dispatch) ... ok
+test_kernel_dispatch_crossing_cutoff_rolls_back_world_mutation (__main__.CutoffBoundaryTests.test_kernel_dispatch_crossing_cutoff_rolls_back_world_mutation) ... ok
+test_kernel_read_crossing_cutoff_does_not_return_content (__main__.CutoffBoundaryTests.test_kernel_read_crossing_cutoff_does_not_return_content) ... ok
+test_kernel_retry_crossing_cutoff_does_not_return_success_receipt (__main__.CutoffBoundaryTests.test_kernel_retry_crossing_cutoff_does_not_return_success_receipt) ... ok
+test_kernel_update_and_accept_crossing_cutoff_roll_back_exact_state (__main__.CutoffBoundaryTests.test_kernel_update_and_accept_crossing_cutoff_roll_back_exact_state) ... ok
+test_worker_exact_entry_cutoff_skips_verifier_and_persistence (__main__.CutoffBoundaryTests.test_worker_exact_entry_cutoff_skips_verifier_and_persistence) ... ok
+test_worker_passes_shorter_of_principal_and_pilot_expiry (__main__.CutoffBoundaryTests.test_worker_passes_shorter_of_principal_and_pilot_expiry) ... ok
+test_worker_verification_crossing_cutoff_denies_authentication_and_call (__main__.CutoffBoundaryTests.test_worker_verification_crossing_cutoff_denies_authentication_and_call) ... ok
+
+----------------------------------------------------------------------
+Ran 14 tests in 0.114s
+
+OK

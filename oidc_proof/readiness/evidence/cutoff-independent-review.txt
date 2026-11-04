@@ -1,0 +1,26 @@
+Independent local cutoff review
+Review date: 2026-11-04 UTC
+Fixed test cutoff: 2026-11-06 12:24 UTC (1793967840)
+Pre-change negative-control HEAD: c9893eb999f85989f4e03de549a1f9ddeb1a4558
+Harness SHA-256: 665f8038d2e3b6987a6d4a69d40c7505a8d5a9f18ab51188521bac18cf154c8e
+
+Results
+- Independently reran python oidc_proof/readiness/test_cutoff_boundary.py: 14 tests passed.
+- Earlier independently ran python -m unittest test_production test_agent_binding test_identity_acceptance -q: 39 tests passed against the same implementation changes.
+- Copied pre-change HEAD production.py, identity.py, kernel.py and mcp_adapter/worker.py into a temporary isolated directory, copied the final harness unchanged, and reran it. Exit code: 1.
+Ran 14 tests in 0.074s
+FAILED (failures=12)
+- Negative-control failures demonstrate sensitivity to pre-change gaps; this is not a deployed-service test.
+
+Review findings
+- No blocking implementation defect found in the stated scope.
+- The revised ObservedLock barrier confirms the second HTTP request reaches the occupied execution lock after verification and body parsing; the prior early-verifier race is resolved.
+- Exact world-row snapshots now supplement counts. Create, update and acceptance rollback, read-result suppression, and replay denial are covered.
+- Exact entry cutoff, delayed verification, delayed body, execution queue, principal expiry clamping, and simulated database-lock delay are covered.
+
+Limits
+- Tests use injected synthetic Principals and controlled clocks, direct ASGI endpoint calls, and temporary SQLite databases. They do not test JWT cryptography, provider reachability, real network transport, live agent runtimes or interoperability.
+- Database contention is simulated by moving the clock after BEGIN IMMEDIATE, not measured with a competing database writer.
+- This is a final pre-commit authorization check, not a strict wall-clock commit or response cutoff. Budget increments and denial audits may persist after expiry. Clock reversal and permanent shutdown latching are outside scope.
+- The fixed date is supplied as configuration, not intrinsically fixed by implementation. No live configuration, grants, credentials, infrastructure or deployment was inspected or changed.
+- No packages installed, sockets opened, or external calls made by this review. Only this evidence file was written persistently by the reviewer.

@@ -137,6 +137,11 @@ class Kernel:
     def request(self, identity, request):
         actor = identity.actor if isinstance(identity, Principal) else identity
         op = request.get('op') if isinstance(request, dict) else None
+        def check_current(principal, space):
+            try:
+                return validate(principal, op, space)
+            except AuthenticationError as exc:
+                raise Fault('unauthenticated', str(exc)) from None
         with self.connection() as db:
             db.execute('BEGIN IMMEDIATE')
             try:
@@ -150,7 +155,7 @@ class Kernel:
                 space = name(args.get('space'), 'space')
                 try:
                     principal = fixture(identity) if isinstance(identity, str) and self.allow_fixture else identity
-                    principal = validate(principal, op, space)
+                    principal = check_current(principal, space)
                     if principal.assurance == 'fixture' and not self.allow_fixture:
                         raise AuthenticationError('fixture identities disabled')
                 except AuthenticationError as exc:
@@ -184,6 +189,7 @@ class Kernel:
                             if own is None or any(own.get(f) != getattr(principal, f) for f in fields):
                                 raise Fault('conflict', 'legacy or mismatched acceptance receipt cannot establish current agent attribution')
                         self.audit(db, actor, op, 'replay')
+                        check_current(principal, space)
                         db.commit()
                         return result
                     used = db.execute('SELECT mutations FROM usage WHERE actor=?', (actor,)).fetchone()
@@ -195,6 +201,10 @@ class Kernel:
                     db.execute('INSERT INTO retries VALUES (?,?,?,?)', (actor, key, digest, encode(response)))
                     db.execute('INSERT INTO usage VALUES (?,1) ON CONFLICT(actor) DO UPDATE SET mutations=mutations+1', (actor,))
                 self.audit(db, actor, op, 'ok')
+                # A transaction can outlive the initial check. Roll back its
+                # world effects if authority expired while it was executing.
+                # This is a final pre-commit gate, not a hard real-time shutdown.
+                check_current(principal, space)
                 db.commit()
                 return response
             except Fault as exc:
