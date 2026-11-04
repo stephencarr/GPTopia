@@ -7,6 +7,7 @@ import json
 import os
 import sys
 import time
+from dataclasses import replace
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from identity import Principal
@@ -43,8 +44,13 @@ class Boundary:
             principal = self.verifier(token)
             if not isinstance(principal, Principal) or principal.assurance != 'verified':
                 return {'status': 401}
+            # The resource cutoff may be shorter than the provider admission.
+            # Carry it into the kernel, including waits for the database lock.
+            principal = replace(principal, expires_at=min(principal.expires_at, self.deadline))
         except Exception:
             return {'status': 401}
+        if not time.time() < self.deadline:
+            return {'status': 403}
         if message.get('action') == 'authenticate':
             return {'status': 200, 'scopes': sorted(principal.scopes)}
         if message.get('action') != 'call':

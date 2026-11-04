@@ -5,6 +5,7 @@ import math
 import os
 import sqlite3
 import time
+from dataclasses import replace
 from pathlib import Path
 from types import MappingProxyType
 from urllib.parse import urlsplit
@@ -240,6 +241,7 @@ def create_app(db_path, resource=None, issuer=None, verifier=None, admissions=No
             principal = await asyncio.to_thread(verifier, auth[0][7:])
             if not isinstance(principal, Principal) or principal.assurance != 'verified':
                 raise AuthenticationError()
+            principal = replace(principal, expires_at=min(principal.expires_at, deadline))
         except Exception:
             return reply(401, 'unauthenticated')
         if not time.time() < deadline:
@@ -259,6 +261,10 @@ def create_app(db_path, resource=None, issuer=None, verifier=None, admissions=No
         except (ValueError, UnicodeError, RecursionError, TimeoutError):
             return reply(400, 'invalid')
         def execute():
+            # Streaming a body or waiting for the execution lock can cross the
+            # cutoff after authentication. Do not start application work then.
+            if not time.time() < deadline:
+                return {'ok': False, 'error': {'code': 'pilot_closed', 'message': 'pilot closed'}}
             with kernel.connection() as db:
                 changed = db.execute('UPDATE request_budget SET used=used+1 WHERE id=1 AND used<10000').rowcount
                 db.commit()
@@ -270,7 +276,7 @@ def create_app(db_path, resource=None, issuer=None, verifier=None, admissions=No
                 result = await asyncio.to_thread(execute)
         except sqlite3.Error:
             return reply(503, 'unavailable')
-        status = 200 if result['ok'] else {'unauthenticated':401, 'forbidden':403, 'not_found':404, 'conflict':409, 'quota':429}.get(result['error']['code'],400)
+        status = 200 if result['ok'] else {'unauthenticated':401, 'forbidden':403, 'pilot_closed':403, 'not_found':404, 'conflict':409, 'quota':429}.get(result['error']['code'],400)
         return JSONResponse(result, status_code=status, headers={'Cache-Control':'no-store', 'X-Content-Type-Options':'nosniff'})
 
     return Starlette(routes=[Route('/{path:path}', dispatch, methods=['GET','POST','PUT','DELETE','PATCH','OPTIONS','HEAD'])])
