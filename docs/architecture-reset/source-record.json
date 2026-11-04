@@ -1,0 +1,39 @@
+{
+  "verified_date": "2026-11-04",
+  "archive_sha256": "15d6ddf4c0f8185a87d7a19b4021181736fff8e762c5d9c15d8d2585751ebac5",
+  "bundle_sha256": "2898a864ff414ce2222eb5ca36e19797ee596beb3e04ad090cbf4e9b5e72942f",
+  "candidate": "9d3df61159f37f0eb134f49d6032b4c0e9279893",
+  "github_main": "89910e7e90ce5fb303dd5ff3b5e089f5b97b4c5f",
+  "baseline_tree": "fb0c9c35b09533860f65f8029e118e15491b97e4",
+  "branches": [
+    {
+      "local_archive_ref": "refs/heads/archive/pip-kernel-0.4",
+      "original_ref": "refs/heads/kernel-0.4",
+      "commit": "2e96cc6f89d47bd3b755d297c1036278592f510c"
+    },
+    {
+      "local_archive_ref": "refs/heads/archive/pip-oidc-proof-03",
+      "original_ref": "refs/heads/oidc-proof-03",
+      "commit": "9d3df61159f37f0eb134f49d6032b4c0e9279893"
+    },
+    {
+      "local_archive_ref": "refs/heads/archive/pip-onboarding-03",
+      "original_ref": "refs/heads/onboarding-03",
+      "commit": "a52ac280a6bcb47445368f91e5db0feb370c05c5"
+    },
+    {
+      "local_archive_ref": "refs/heads/archive/pip-prototype",
+      "original_ref": "refs/heads/prototype",
+      "commit": "0e631e6a410a8918919eef66579f943adc3fde4a"
+    },
+    {
+      "local_archive_ref": "refs/heads/archive/pip-workos-compat-03",
+      "original_ref": "refs/heads/workos-compat-03",
+      "commit": "796dae8170280355582b4858bc9b3e51e9d36388"
+    }
+  ],
+  "checksums": "All payload checksums passed; archive checksum is locally computed, not externally authenticated",
+  "bundle_verify": "Complete history; no prerequisites",
+  "fsck": "Passed after import",
+  "remote_publication": "Pending deployment-trigger verification and GitHub API access"
+}
