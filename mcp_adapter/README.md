@@ -274,3 +274,35 @@ Sources: [official SDK legacy serving](https://ts.sdk.modelcontextprotocol.io/v2
 [legacy lifecycle and counter-offer rule](https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle),
 and installed locked SDK2.4.0 source/types (`createLegacyStatelessFallback`,
 `Server._oninitialize`, `supportedProtocolVersions`).
+
+## Renewable-access consent experiment
+
+`GPTOPIA_REQUEST_OFFLINE_ACCESS=true` adds `offline_access` to read-only tools'
+OAuth consent metadata, in both the top-level and `_meta` declarations. It is
+**off by default**; use only for an owner-approved renewal experiment. Only the
+literal `true` or `false` is accepted. Existing operation scope checks, JWT
+validation, resource metadata, admission lifetimes and write-tool declarations
+are unchanged. A token does not need `offline_access` to call an otherwise
+permitted operation, and `offline_access` alone grants no world access.
+
+This is a host consent hint, not a refresh implementation or a promise that the
+host consumes the hint. The resource never stores or exchanges refresh tokens.
+The host must request offline access during authorization, obtain and retain its
+own refresh token, then exchange it at the issuer. Auth0's API offline-access
+eligibility and the specific application's refresh-token grant must be enabled.
+A host may need to refresh installed tool metadata before fresh owner consent.
+An already-expired connection may not be able to list tools; do not assume the
+metadata change alone solves the host's initial authorization configuration.
+
+Keep access tokens short-lived. Test a read immediately after consent and again
+more than 15 minutes later without reconnecting; repeat across a second expiry
+to exercise rotation. Record timestamps and error classes, never token values.
+If `oauth_refresh_token_missing` persists, inspect the authorize request's scope
+names and the provider's token-issuance outcome through approved diagnostics;
+do not repeat unchanged reconnects. Confirm each host separately.
+
+Renewable credentials can preserve all previously granted application scopes,
+including writes, even though this hint appears only on read tools. They do not
+bypass admission expiry, revocation, the configured service deadline or the
+separate scheduled shutdown. Turning the flag off removes the hint but does not
+revoke refresh tokens already issued; revocation is a separate provider action.

@@ -7,7 +7,7 @@ const outputs=new Map(definitions.map(t=>[t.name,ajv.compile(t.outputSchema)]));
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {Client,StreamableHTTPClientTransport} from '@modelcontextprotocol/client';
-import {makeServer,Worker,definitions,validateAdvertisedScopes,readOnlyScopes} from './server.mjs';
+import {makeServer,Worker,definitions,validateAdvertisedScopes,readOnlyScopes,parseOfflineAccess} from './server.mjs';
 
 async function start(boundary,options={}) {
   const service=makeServer(boundary,{resource:'https://world.example',issuer:'https://issuer.example',...options});
@@ -107,5 +107,43 @@ test('invalid advertised-scope environment exits before serving or spawning a wo
      child.once('exit',code=>{clearTimeout(timer);resolve(code);});
    });
    assert.notEqual(code,0);
+ }
+});
+
+test('offline access configuration is explicit and rejects ambiguous values',()=>{
+ assert.equal(parseOfflineAccess(undefined),false);
+ assert.equal(parseOfflineAccess('false'),false);
+ assert.equal(parseOfflineAccess('true'),true);
+ for(const value of ['', '1', 'TRUE', null, true]) assert.throws(()=>parseOfflineAccess(value));
+ assert.throws(()=>makeServer({}, {requestOfflineAccess:'true'}));
+});
+test('optional renewal consent is advertised over HTTP without becoming API authority',async()=>{
+ for(const enabled of [false,true]) {
+  let calls=0;
+  const boundary={request:async message=>{
+   if(message.action==='authenticate') return {status:200,scopes:message.token==='renewal-only'?['offline_access']:['world:discover']};
+   calls++;return {status:200,result:{ok:true,result:{}}};
+  }};
+  const s=await start(boundary,{requestOfflineAccess:enabled});
+  const metadata={'io.modelcontextprotocol/protocolVersion':'2026-07-28','io.modelcontextprotocol/clientInfo':{name:'renewal-test',version:'1'},'io.modelcontextprotocol/clientCapabilities':{}};
+  const rpc=(method,params={},token='read')=>fetch(s.url+'/mcp',{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json',accept:'application/json, text/event-stream','mcp-protocol-version':'2026-07-28','mcp-method':method,...(params.name?{'mcp-name':params.name}:{})},body:JSON.stringify({jsonrpc:'2.0',id:1,method,params:{...params,_meta:metadata}})});
+  try {
+   const listing=await (await rpc('tools/list')).json();
+   assert.equal(listing.result.tools.length,9);
+   for(const t of listing.result.tools) {
+    const definition=definitions.find(d=>d.name===t.name);
+    const expected=enabled && !definition.mutates?[...definition.requiredScopes,'offline_access']:definition.requiredScopes;
+    assert.deepEqual(t.securitySchemes[0].scopes,expected);
+    assert.deepEqual(t._meta.securitySchemes,t.securitySchemes);
+   }
+   const discovery=await (await fetch(s.url+'/.well-known/oauth-protected-resource')).json();
+   assert.deepEqual(discovery.scopes_supported,[...readOnlyScopes]);
+   assert.equal((await rpc('tools/call',{name:'world_discover',arguments:{space:'pilot'}})).status,200);
+   assert.equal(calls,1);
+   assert.equal((await rpc('tools/call',{name:'world_discover',arguments:{space:'pilot'}},'renewal-only')).status,403);
+   assert.equal((await rpc('tools/call',{name:'world_create',arguments:{space:'pilot',content:'denied',readers:[],writers:[],idempotency_key:'denied'}})).status,403);
+   assert.equal(calls,1);
+   assert.equal((await fetch(s.url+'/mcp',{method:'POST'})).status,401);
+  } finally {await s.close();}
  }
 });
