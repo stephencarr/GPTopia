@@ -1,5 +1,10 @@
 # GPTopia bounded pilot deployment preparation
 
+Current operation: the arbitrary pilot cutoff is retired by owner direction.
+See [the explicit configuration migration](docs/retire-pilot-cutoff.md).
+The dated pilot instructions below are historical; token expiry and authorization
+remain enforced.
+
 Checked 2026-10-30. **Local preparation, not a deployment or live connection.** User authorized a new Railway project on the existing account/plan and US$10 incremental usage over seven days. No authorization to create credentials, grant client permissions, pay another provider, or alter existing projects/shared spend caps.
 
 ## What is ready

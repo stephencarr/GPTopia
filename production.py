@@ -75,8 +75,8 @@ def validate_admissions(admissions):
         if any(not IDENT.fullmatch(v) for v in grant['spaces']) or not set(grant['scopes']) <= set(SCOPES.values()):
             raise ValueError('unknown scopes or malformed spaces')
         expiry = grant.get('expires_at')
-        if type(expiry) not in (int, float) or not math.isfinite(expiry) or not now < expiry <= now + 7*86400:
-            raise ValueError('admission expiry must be within seven days')
+        if expiry is not None and (type(expiry) not in (int, float) or not math.isfinite(expiry) or not now < expiry):
+            raise ValueError('invalid admission expiry')
     return admissions
 
 
@@ -153,11 +153,11 @@ class JWTVerifier:
             if not match:
                 raise ValueError('not admitted')
             grant_id, grant = match
-            if not now < grant['expires_at']:
+            if grant['expires_at'] is not None and not now < grant['expires_at']:
                 raise ValueError('not admitted')
             return Principal(grant['actor'], self.issuer, c['sub'], grant['control_domain'],
                              frozenset(grant['spaces']), frozenset(c['scope'].split()) & frozenset(grant['scopes']),
-                             AUDIENCE, min(c['exp'], grant['expires_at']), assurance='verified',
+                             AUDIENCE, c['exp'] if grant['expires_at'] is None else min(c['exp'], grant['expires_at']), assurance='verified',
                              client_id=c['azp'], grant_id=grant_id)
         except Exception:
             raise AuthenticationError('invalid credentials') from None
@@ -185,18 +185,34 @@ def advertised_scopes_from_env():
     return advertised_scope_list(value)
 
 
+def deadline_from_env():
+    # Missing configuration stays closed; 'none' is an explicit operator choice.
+    value = os.getenv('GPTOPIA_DEADLINE', '0')
+    if value == 'none':
+        return None
+    try:
+        return float(value)
+    except (ValueError, TypeError):
+        raise ValueError('invalid service deadline') from None
+
+
+def validate_deadline(deadline):
+    if deadline is None:
+        return
+    if (type(deadline) not in (int, float) or not math.isfinite(deadline)
+            or (deadline != 0 and not time.time() < deadline)):
+        raise ValueError('invalid service deadline')
+
+
 def create_app(db_path, resource=None, issuer=None, verifier=None, admissions=None, deadline=0, advertised_scopes=None):
-    """No verifier/deadline means all application routes deny, health stays live."""
+    """Zero deadline stays closed; explicit None removes only the service cutoff."""
     advertised_scopes = advertised_scope_list(advertised_scopes)
     admissions = validate_admissions({} if admissions is None else admissions)
     if resource is not None:
         resource_origin(resource)
     if issuer is not None:
         https_url(issuer)
-    if type(deadline) not in (int, float) or not math.isfinite(deadline):
-        raise ValueError('invalid pilot deadline')
-    if deadline and (not time.time() < deadline <= time.time() + 7*86400):
-        raise ValueError('pilot deadline must be within seven days')
+    validate_deadline(deadline)
     kernel = Kernel(db_path, max_mutations=100, max_objects=10, allow_fixture=False)
     Path(db_path).parent.mkdir(parents=True, exist_ok=True)
     with kernel.connection() as db:
@@ -220,7 +236,7 @@ def create_app(db_path, resource=None, issuer=None, verifier=None, admissions=No
         if request.url.path == '/.well-known/oauth-protected-resource' and request.method == 'GET' and resource and issuer:
             return JSONResponse({'resource': resource, 'authorization_servers': [issuer], 'scopes_supported': advertised_scopes})
         # Closed pilots do not perform token verification or outbound JWKS work.
-        if deadline and not time.time() < deadline:
+        if deadline is not None and deadline != 0 and not time.time() < deadline:
             return reply(403, 'pilot_closed')
         # Authenticate before path routing, payload read or database writes.
         if request.headers.get('origin') or request.headers.get('x-test-actor'):
@@ -241,10 +257,11 @@ def create_app(db_path, resource=None, issuer=None, verifier=None, admissions=No
             principal = await asyncio.to_thread(verifier, auth[0][7:])
             if not isinstance(principal, Principal) or principal.assurance != 'verified':
                 raise AuthenticationError()
-            principal = replace(principal, expires_at=min(principal.expires_at, deadline))
+            if deadline is not None:
+                principal = replace(principal, expires_at=min(principal.expires_at, deadline))
         except Exception:
             return reply(401, 'unauthenticated')
-        if not time.time() < deadline:
+        if deadline is not None and not time.time() < deadline:
             return reply(403, 'pilot_closed')
         if request.url.path != '/v1' or request.method != 'POST':
             return reply(404, 'not_found')
@@ -263,7 +280,7 @@ def create_app(db_path, resource=None, issuer=None, verifier=None, admissions=No
         def execute():
             # Streaming a body or waiting for the execution lock can cross the
             # cutoff after authentication. Do not start application work then.
-            if not time.time() < deadline:
+            if deadline is not None and not time.time() < deadline:
                 return {'ok': False, 'error': {'code': 'pilot_closed', 'message': 'pilot closed'}}
             with kernel.connection() as db:
                 changed = db.execute('UPDATE request_budget SET used=used+1 WHERE id=1 AND used<10000').rowcount
@@ -286,10 +303,10 @@ def from_env():
     advertised_scopes = advertised_scopes_from_env()
     resource, issuer = os.getenv('GPTOPIA_RESOURCE'), os.getenv('GPTOPIA_ISSUER')
     grants = json.loads(os.getenv('GPTOPIA_ADMISSIONS', '{}'))
-    deadline = float(os.getenv('GPTOPIA_DEADLINE', '0'))
+    deadline = deadline_from_env()
     verifier = None
     if os.getenv('GPTOPIA_JWKS_URL'):
-        if not resource or not issuer or not grants or not deadline:
+        if not resource or not issuer or not grants or deadline == 0:
             raise ValueError('incomplete authentication configuration')
         verifier = JWTVerifier(issuer, resource, os.environ['GPTOPIA_JWKS_URL'], grants)
     return create_app(os.getenv('GPTOPIA_DB', '/data/world.sqlite3'), resource, issuer, verifier, grants, deadline,

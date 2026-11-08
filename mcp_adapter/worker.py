@@ -5,6 +5,7 @@ inject generated RSA keys in-process; no fixture credential mode exists here.
 """
 import json
 import os
+import sqlite3
 import sys
 import time
 from dataclasses import replace
@@ -12,15 +13,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from identity import Principal
 from kernel import Kernel, initialize_schema
-from production import JWTVerifier, validate_admissions, register_admissions
+from production import JWTVerifier, validate_admissions, register_admissions, deadline_from_env, validate_deadline
 
 
 class Boundary:
     def __init__(self, db_path, verifier=None, admissions=None, deadline=0):
         admissions = validate_admissions({} if admissions is None else admissions)
         self.verifier, self.deadline = verifier, deadline
-        if deadline and not time.time() < deadline <= time.time() + 7 * 86400:
-            raise ValueError('pilot deadline must be within seven days')
+        validate_deadline(deadline)
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         self.kernel = Kernel(db_path, max_mutations=100, max_objects=10, allow_fixture=False)
         with self.kernel.connection() as db:
@@ -35,7 +35,7 @@ class Boundary:
             return {'status': 200}
         if not self.verifier:
             return {'status': 401}
-        if not time.time() < self.deadline:
+        if self.deadline is not None and not time.time() < self.deadline:
             return {'status': 403}
         try:
             token = message['token']
@@ -46,10 +46,11 @@ class Boundary:
                 return {'status': 401}
             # The resource cutoff may be shorter than the provider admission.
             # Carry it into the kernel, including waits for the database lock.
-            principal = replace(principal, expires_at=min(principal.expires_at, self.deadline))
+            if self.deadline is not None:
+                principal = replace(principal, expires_at=min(principal.expires_at, self.deadline))
         except Exception:
             return {'status': 401}
-        if not time.time() < self.deadline:
+        if self.deadline is not None and not time.time() < self.deadline:
             return {'status': 403}
         if message.get('action') == 'authenticate':
             return {'status': 200, 'scopes': sorted(principal.scopes)}
@@ -66,10 +67,10 @@ class Boundary:
 def from_env():
     resource, issuer = os.getenv('GPTOPIA_RESOURCE'), os.getenv('GPTOPIA_ISSUER')
     grants = json.loads(os.getenv('GPTOPIA_ADMISSIONS', '{}'))
-    deadline = float(os.getenv('GPTOPIA_DEADLINE', '0'))
+    deadline = deadline_from_env()
     verifier = None
     if os.getenv('GPTOPIA_JWKS_URL'):
-        if not resource or not issuer or not grants or not deadline:
+        if not resource or not issuer or not grants or deadline == 0:
             raise ValueError('incomplete authentication configuration')
         verifier = JWTVerifier(issuer, resource, os.environ['GPTOPIA_JWKS_URL'], grants)
     return Boundary(os.getenv('GPTOPIA_DB', '/tmp/gptopia-mcp/world.sqlite3'), verifier, grants, deadline)
@@ -90,5 +91,23 @@ def serve(boundary):
         print(json.dumps(dict(response, id=request_id), ensure_ascii=True), flush=True)
 
 
+def main():
+    try:
+        boundary = from_env()
+    except Exception as exc:
+        # Only fixed reason codes cross stderr: never exception text or config.
+        if isinstance(exc, ValueError):
+            code = {'invalid admission expiry': 'admission_expiry_invalid',
+                    'invalid service deadline': 'service_deadline_invalid'}.get(str(exc), 'configuration_invalid')
+        elif isinstance(exc, (sqlite3.Error, OSError)):
+            code = 'storage_unavailable'
+        else:
+            code = 'unexpected_startup_failure'
+        print('GPTOPIA_WORKER_STARTUP_ERROR:' + code, file=sys.stderr, flush=True)
+        return 1
+    serve(boundary)
+    return 0
+
+
 if __name__ == '__main__':
-    serve(from_env())
+    sys.exit(main())

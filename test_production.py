@@ -64,7 +64,7 @@ class ProductionTests(unittest.TestCase):
     def test_malformed_admissions_fail_at_startup(self):
         import copy
         from production import validate_admissions
-        for field, value in [('client_id',None),('client_id',''),('actor',''),('control_domain',None),('spaces','pilot'),('spaces',[]),('scopes',['admin:all']),('expires_at',True),('expires_at',float('inf')),('expires_at',self.now+8*86400)]:
+        for field, value in [('client_id',None),('client_id',''),('actor',''),('control_domain',None),('spaces','pilot'),('spaces',[]),('scopes',['admin:all']),('expires_at',True),('expires_at',float('inf')),('expires_at',self.now-1)]:
             grants=copy.deepcopy(self.grants)
             grants['grant-pip'][field]=value
             with self.subTest(field=field,value=value), self.assertRaises(ValueError):

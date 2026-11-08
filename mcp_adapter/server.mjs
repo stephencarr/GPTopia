@@ -23,7 +23,21 @@ for (const t of definitions) for (const p of Object.values(t.inputSchema.propert
 }
 export class Worker {
   constructor(child, {timeoutMs=10000}={}) {
-    this.child = child ?? spawn('python', ['-u', fileURLToPath(new URL('./worker.py', import.meta.url))], {stdio:['pipe','pipe','ignore']});
+    this.child = child ?? spawn('python', ['-u', fileURLToPath(new URL('./worker.py', import.meta.url))], {stdio:['pipe','pipe','pipe']});
+    const startupCodes=new Set(['admission_expiry_invalid','service_deadline_invalid','configuration_invalid','storage_unavailable','unexpected_startup_failure']);
+    let diagnostic='',overflow=false;
+    this.child.stderr?.setEncoding('utf8');
+    this.child.stderr?.on('data',chunk=>{
+      for(const character of chunk) {
+        if(character==='\n') {
+          const prefix='GPTOPIA_WORKER_STARTUP_ERROR:';
+          if(!overflow && diagnostic.startsWith(prefix) && startupCodes.has(diagnostic.slice(prefix.length)))
+            console.error(diagnostic);
+          diagnostic='';overflow=false;
+        } else if(diagnostic.length<128 && !overflow) diagnostic+=character;
+        else {diagnostic='';overflow=true;}
+      }
+    });
     this.pending = [];
     this.closed = false;
     this.sequence = 0;

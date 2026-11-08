@@ -77,3 +77,12 @@ for(const mode of ['worker','handler']) {
   }finally{await c.close();await bounded(s.close());}
  });
 }
+
+test('worker stderr logs fixed startup diagnostics and drops arbitrary output',async t=>{
+ const logged=[];t.mock.method(console,'error',line=>logged.push(line));
+ const script="process.stderr.write('SECRET_TOKEN\\nGPTOPIA_WORKER_STARTUP_ERROR:unknown-secret\\n'+ 'x'.repeat(1000)+'\\nGPTOPIA_WORKER_STARTUP_ERROR:admission_expiry_invalid\\n');";
+ const w=new Worker(spawn(process.execPath,['-e',script],{stdio:['pipe','pipe','pipe']}));
+ await bounded(w.exited);
+ assert.deepEqual(logged,['GPTOPIA_WORKER_STARTUP_ERROR:admission_expiry_invalid']);
+ await bounded(w.close());
+});
