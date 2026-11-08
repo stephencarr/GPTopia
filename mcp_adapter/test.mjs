@@ -6,7 +6,7 @@ const ajv=new Ajv2020({strict:false});
 const outputs=new Map(definitions.map(t=>[t.name,ajv.compile(t.outputSchema)]));
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
-import {Client,StreamableHTTPClientTransport} from '@modelcontextprotocol/client';
+import {Client,StreamableHTTPClientTransport,auth} from '@modelcontextprotocol/client';
 import {makeServer,Worker,definitions,validateAdvertisedScopes,readOnlyScopes,parseOfflineAccess} from './server.mjs';
 
 async function start(boundary,options={}) {
@@ -137,7 +137,21 @@ test('optional renewal consent is advertised over HTTP without becoming API auth
     assert.deepEqual(t._meta.securitySchemes,t.securitySchemes);
    }
    const discovery=await (await fetch(s.url+'/.well-known/oauth-protected-resource')).json();
-   assert.deepEqual(discovery.scopes_supported,[...readOnlyScopes]);
+   assert.deepEqual(discovery.scopes_supported,enabled?[...readOnlyScopes,'offline_access']:[...readOnlyScopes]);
+   // Use the SDK's actual authorization orchestrator, not a hand-built scope URL.
+   // The issuer fixture deliberately omits offline_access auto-augmentation.
+   let authorization;
+   const provider={
+    redirectUrl:'https://client.example/callback',
+    clientMetadata:{redirect_uris:['https://client.example/callback'],grant_types:['authorization_code'],response_types:['code'],token_endpoint_auth_method:'none'},
+    clientInformation:()=>({client_id:'synthetic-client',issuer:'https://issuer.example'}),
+    tokens:()=>undefined,
+    discoveryState:()=>({authorizationServerUrl:'https://issuer.example',resourceMetadata:discovery,authorizationServerMetadata:{issuer:'https://issuer.example',authorization_endpoint:'https://issuer.example/authorize',token_endpoint:'https://issuer.example/token',response_types_supported:['code'],code_challenge_methods_supported:['S256']}}),
+    saveCodeVerifier:()=>{},redirectToAuthorization:url=>{authorization=url;}
+   };
+   assert.equal(await auth(provider,{serverUrl:'https://world.example/mcp',fetchFn:()=>{throw new Error('unexpected external request');}}),'REDIRECT');
+   assert.deepEqual(authorization.searchParams.get('scope').split(' '),discovery.scopes_supported);
+   assert.equal(authorization.searchParams.get('prompt'),enabled?'consent':null);
    assert.equal((await rpc('tools/call',{name:'world_discover',arguments:{space:'pilot'}})).status,200);
    assert.equal(calls,1);
    assert.equal((await rpc('tools/call',{name:'world_discover',arguments:{space:'pilot'}},'renewal-only')).status,403);

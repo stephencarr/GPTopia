@@ -160,7 +160,7 @@ export function makeServer(boundary, {resource, issuer, publicHost, advertisedSc
     const url=new URL(request.url);
     if (request.headers.has('origin')) return response(403,'invalid_origin');
     if (url.pathname===metadataPath && request.method==='GET' && resource && issuer)
-      return Response.json({resource,authorization_servers:[issuer],scopes_supported:advertisedScopes,bearer_methods_supported:['header']},{headers:{'cache-control':'no-store'}});
+      return Response.json({resource,authorization_servers:[issuer],scopes_supported:requestOfflineAccess?[...advertisedScopes,'offline_access']:advertisedScopes,bearer_methods_supported:['header']},{headers:{'cache-control':'no-store'}});
     if (['/health','/healthz'].includes(url.pathname) && request.method==='GET') {
       const health=await boundary.request({action:'health'});
       return health.status===200?Response.json({status:'ok'}):response(503,'unavailable');

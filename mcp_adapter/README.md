@@ -278,10 +278,11 @@ and installed locked SDK2.4.0 source/types (`createLegacyStatelessFallback`,
 ## Renewable-access consent experiment
 
 `GPTOPIA_REQUEST_OFFLINE_ACCESS=true` adds `offline_access` to read-only tools'
-OAuth consent metadata, in both the top-level and `_meta` declarations. It is
+OAuth consent metadata, in both the top-level and `_meta` declarations, and to
+the public protected-resource metadata's `scopes_supported` list. It is
 **off by default**; use only for an owner-approved renewal experiment. Only the
 literal `true` or `false` is accepted. Existing operation scope checks, JWT
-validation, resource metadata, admission lifetimes and write-tool declarations
+validation, admission lifetimes and write-tool declarations
 are unchanged. A token does not need `offline_access` to call an otherwise
 permitted operation, and `offline_access` alone grants no world access.
 
@@ -306,3 +307,14 @@ including writes, even though this hint appears only on read tools. They do not
 bypass admission expiry, revocation, the configured service deadline or the
 separate scheduled shutdown. Turning the flag off removes the hint but does not
 revoke refresh tokens already issued; revocation is a separate provider action.
+
+
+The November 8 browser observation showed seven application scopes and no
+`offline_access` in Pip's actual authorization request. Tool-list metadata alone
+had not established a working request. The opt-in now also advertises the
+credential scope in public authorization discovery, available before login.
+An integration test feeds that HTTP metadata through the installed official SDK's
+OAuth orchestrator and checks the resulting authorize scope and consent prompt.
+This validates the standard-client path, not Pip's implementation: explicit host
+scope overrides or cached discovery can still take precedence. Verify the actual
+browser request includes offline_access before another timed renewal test.
